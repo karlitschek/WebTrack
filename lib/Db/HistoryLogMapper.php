@@ -66,7 +66,7 @@ class HistoryLogMapper extends QBMapper {
             ->setMaxResults($limit);
 
         $result = $qb->executeQuery();
-        $rows   = $result->fetchAllAssociative();
+        $rows   = $result->fetchAll();
         $result->closeCursor();
         return $rows;
     }

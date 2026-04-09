@@ -25,7 +25,7 @@ class RecentFindsWidget implements IAPIWidgetV2 {
     }
 
     public function getTitle(): string {
-        return $this->l->t('WebTrack – Recent Keyword Finds');
+        return $this->l->t('WebTrack');
     }
 
     public function getOrder(): int {
@@ -48,7 +48,7 @@ class RecentFindsWidget implements IAPIWidgetV2 {
         $rows = $this->historyMapper->findLatestFoundByUser($userId, $limit);
         $appUrl = $this->urlGenerator->linkToRouteAbsolute('webtrack.page.index');
         $iconUrl = $this->urlGenerator->getAbsoluteURL(
-            $this->urlGenerator->imagePath('webtrack', 'app.svg')
+            $this->urlGenerator->imagePath('webtrack', 'app-dark.svg')
         );
 
         $items = array_map(static function (array $row) use ($appUrl, $iconUrl): WidgetItem {

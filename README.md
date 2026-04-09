@@ -56,6 +56,15 @@ Once a keyword is found, re-notifications are suppressed for `checkInterval × 3
 ### Monitor Settings
 ![WebTrack monitor settings](screenshots/Screenshot%202026-04-09%20at%2022.36.06.png)
 
+### Notification
+![WebTrack notification](screenshots/Screenshot%202026-04-09%20at%2022.36.42.png)
+
+### Talk Integration
+![WebTrack Talk integration](screenshots/Screenshot%202026-04-09%20at%2022.37.07.png)
+
+### Dashboard Widget
+![WebTrack dashboard widget](screenshots/Screenshot%202026-04-10%20at%2000.12.29.png)
+
 ---
 
 ## Installation
