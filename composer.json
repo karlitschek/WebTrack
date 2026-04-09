@@ -1,0 +1,22 @@
+{
+    "name": "nextcloud/webtrack",
+    "description": "Monitor websites for keywords and get notified",
+    "type": "project",
+    "license": "AGPL-3.0-only",
+    "require": {},
+    "require-dev": {
+        "nextcloud/ocp": "dev-master"
+    },
+    "autoload": {
+        "psr-4": {
+            "OCA\\WebTrack\\": "lib/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "allow-plugins": {
+            "composer/package-versions-deprecated": true
+        }
+    }
+}

@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+    <id>webtrack</id>
+    <name>WebTrack</name>
+    <summary>Monitor websites and RSS/Atom feeds for keywords and get notified with Nextcloud notifications and optional Talk messages</summary>
+    <description><![CDATA[WebTrack monitors websites and RSS/Atom feeds for specific keywords.
+When a keyword appears, you receive a Nextcloud notification and optionally a message in a Talk room.]]></description>
+    <version>1.0.0</version>
+    <licence>agpl</licence>
+    <author>Frank Karlitschek</author>
+    <namespace>WebTrack</namespace>
+    <category>tools</category>
+    <dependencies>
+        <nextcloud min-version="28" max-version="34"/>
+    </dependencies>
+    <navigations>
+        <navigation>
+            <name>WebTrack</name>
+            <route>webtrack.page.index</route>
+            <icon>app.svg</icon>
+        </navigation>
+    </navigations>
+    <background-jobs>
+        <job>OCA\WebTrack\BackgroundJob\CheckMonitorsJob</job>
+        <job>OCA\WebTrack\BackgroundJob\PurgeHistoryJob</job>
+    </background-jobs>
+    <dashboard>
+        <widget id="webtrack-recent-finds"/>
+    </dashboard>
+</info>

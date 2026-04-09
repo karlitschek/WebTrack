@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(cat /Volumes/frank/webtrack/node_modules/@nextcloud/vue/dist/chunks/NcDashboardWidgetItem-*.mjs)",
+      "Bash(node -e \"const pkg = require\\('/Volumes/frank/webtrack/node_modules/@nextcloud/vue/package.json'\\); console.log\\(JSON.stringify\\(pkg.exports?.['./dist/Components/NcDashboardWidget.js'] ?? pkg.exports?.['./dist/Components/NcDashboardWidget.mjs'] ?? 'missing', null, 2\\)\\)\")",
+      "Bash(node -e \"const pkg = require\\('/Volumes/frank/webtrack/node_modules/@nextcloud/vue/package.json'\\); const keys = Object.keys\\(pkg.exports || {}\\); console.log\\(keys.filter\\(k => k.includes\\('Dashboard'\\)\\)\\)\")",
+      "Bash(node -e \"const pkg = require\\('/Volumes/frank/webtrack/node_modules/@nextcloud/vue/package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(pkg.exports || {}\\).slice\\(0, 10\\)\\)\\)\")",
+      "Bash(python3 -c ':*)",
+      "Bash(python3 -c \"import sys,json; pkgs=json.load\\(sys.stdin\\).get\\('packages',[]\\); [print\\(p['name'], p['version']\\) for p in pkgs]\")",
+      "Bash(mdfind -name \"IWidget.php\")",
+      "Bash(mdfind \"kMDItemFSName == 'IWidget.php'\")",
+      "Read(//private/tmp/**)",
+      "Bash(unzip -q /Volumes/frank/.cache/composer/files/nextcloud/ocp/5647ada91884c657c0617e0928b5958d33e54f77.zip -d ocp_extracted)",
+      "Read(//tmp/**)",
+      "Bash(xargs ls:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.nextcloud.com)",
+      "WebFetch(domain:nextcloud.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:nextcloud-server.netlify.app)",
+      "Bash(gh auth:*)",
+      "Bash(git config:*)",
+      "Bash(git init:*)",
+      "Bash(echo \"node_modules/\\\\nvendor/\")",
+      "Bash(git branch:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
