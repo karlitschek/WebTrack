@@ -6,6 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `TablesController`: proxies Tables list and column schema to the frontend
+  (`GET /api/v1/tables`, `GET /api/v1/tables/{id}/columns`); gracefully
+  returns empty array when the Tables app is not installed
 - `TablesService`: thin HTTP wrapper around Nextcloud Tables REST API v1
   (`listTables`, `getTableSchema`, `getColumns`, `insertRow`, `searchRows`)
 - `DomainLookupService`: maps article URLs to Nextcloud Tables selection IDs
