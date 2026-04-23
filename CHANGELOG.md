@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `TablesRowBuilder`: assembles the `data` payload for a Tables row from a feed
+  entry; resolves column IDs by title matching; uses `DomainLookupService` for
+  Country, Tier, and Category; derives Publication from article hostname;
+  formats Headline as a Markdown hyperlink; sets Source=Organic, Counter=1
+- `FeedService::parseEntries()` now includes `pubDate` from RSS and Atom feeds
+- `MonitorService`: when a matched feed entry has a configured `tablesTableId`,
+  inserts a row via `TablesService` (columns fetched once per check cycle)
 - `ScoringService`: scores feed entries (+1 per boost keyword, −2 per exclude
   pattern) and gates entries below `scoreThreshold`; integrated into
   `MonitorService::handleFeedContent()`

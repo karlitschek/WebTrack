@@ -61,6 +61,15 @@ class DomainLookupService {
     public const TIER_OTHER          = 4;   // other
 
     // -------------------------------------------------------------------------
+    // Source IDs
+    // -------------------------------------------------------------------------
+    public const SOURCE_ORGANIC          = 0;
+    public const SOURCE_PRESS_RELEASE    = 1;
+    public const SOURCE_INTERVIEW        = 2;
+    public const SOURCE_WRITTEN_STATEMENT= 3;
+    public const SOURCE_BLOG             = 4;
+
+    // -------------------------------------------------------------------------
     // Category IDs
     // -------------------------------------------------------------------------
     public const CAT_MEDIA_ARTICLE = 0;

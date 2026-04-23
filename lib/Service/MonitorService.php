@@ -23,6 +23,8 @@ class MonitorService {
         private FeedService         $feedService,
         private SnippetService      $snippetService,
         private ScoringService      $scoringService,
+        private TablesService       $tablesService,
+        private TablesRowBuilder    $tablesRowBuilder,
         private NotificationService $notificationService,
         private IL10N               $l,
         private LoggerInterface     $logger,
@@ -218,10 +220,24 @@ class MonitorService {
         $entries    = $this->feedService->parseEntries($content);
         $newEntries = $this->feedService->filterNewEntries($monitor->getId(), $entries);
 
+        // Fetch the Tables column schema once (if configured) to avoid N requests.
+        $tableColumns = [];
+        if ($monitor->getTablesTableId() !== null) {
+            try {
+                $tableColumns = $this->tablesService->getColumns($monitor->getTablesTableId());
+            } catch (\Throwable $e) {
+                $this->logger->warning('[webtrack] Could not load Tables columns for monitor {id}: {err}', [
+                    'id'  => $monitor->getId(),
+                    'err' => $e->getMessage(),
+                ]);
+            }
+        }
+
         foreach ($newEntries as $entry) {
             $url     = $entry['id'];   // feed entry ID is typically the article URL
             $title   = $entry['title'];
             $body    = $entry['content'];
+            $pubDate = $entry['pubDate'] ?? '';
             $combined = $title . ' ' . strip_tags($body);
 
             // Relevance filter: only applied for non-custom source types or when
@@ -241,7 +257,46 @@ class MonitorService {
                 $monitor->setStatus('found');
                 $this->notificationService->notifyFound($monitor, $snippet);
                 $this->logEvent($monitor, 'found', $snippet);
+
+                // Write to Nextcloud Tables when configured.
+                if ($monitor->getTablesTableId() !== null && $tableColumns !== []) {
+                    $this->insertTablesRow($monitor, $tableColumns, $url, $title, $pubDate);
+                }
             }
+        }
+    }
+
+    /**
+     * Inserts a matched article as a new row in the monitor's configured table.
+     *
+     * @param array<array{id:int,title:string,type:string,selectionOptions?:array<array{id:int,label:string}>}> $columns
+     */
+    private function insertTablesRow(
+        Monitor $monitor,
+        array   $columns,
+        string  $url,
+        string  $title,
+        string  $pubDate,
+    ): void {
+        try {
+            $data = $this->tablesRowBuilder->build(
+                columns:    $columns,
+                monitor:    $monitor,
+                entryUrl:   $url,
+                title:      $title,
+                pubDate:    $pubDate,
+                campaignId: $monitor->getTablesCampaignId(),
+            );
+            $this->tablesService->insertRow($monitor->getTablesTableId(), $data);
+            $this->logger->info('[webtrack] Tables row inserted for monitor {id}: {title}', [
+                'id'    => $monitor->getId(),
+                'title' => mb_substr($title, 0, 80),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('[webtrack] Tables insert failed for monitor {id}: {err}', [
+                'id'  => $monitor->getId(),
+                'err' => $e->getMessage(),
+            ]);
         }
     }
 
