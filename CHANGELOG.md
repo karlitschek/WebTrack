@@ -6,6 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `MonitorForm`: source type selector (Custom / Google News / YouTube),
+  language/region picker, relevance-score threshold, boost-keyword and
+  exclude-pattern inputs, target-table picker, and Campaign pre-fill selector
 - `TablesController`: proxies Tables list and column schema to the frontend
   (`GET /api/v1/tables`, `GET /api/v1/tables/{id}/columns`); gracefully
   returns empty array when the Tables app is not installed
