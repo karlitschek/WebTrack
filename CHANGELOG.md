@@ -6,6 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `DomainLookupService`: maps article URLs to Nextcloud Tables selection IDs
+  for Country, Tier, and Category; seeded from ~1 500 historical PR Coverage
+  rows with TLD-based fallback for unknown domains
 - New `wn_monitors` columns for Google News / YouTube source type, relevance
   scoring, and Nextcloud Tables integration (`source_type`, `source_language`,
   `score_threshold`, `boost_keywords`, `exclude_patterns`, `tables_table_id`,
