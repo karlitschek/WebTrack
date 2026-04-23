@@ -93,8 +93,7 @@
 </template>
 
 <script>
-import NcModal  from '@nextcloud/vue/dist/Components/NcModal.js'
-import NcButton from '@nextcloud/vue/dist/Components/NcButton.js'
+import { NcModal, NcButton } from '@nextcloud/vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import * as api from '../services/api.js'
 

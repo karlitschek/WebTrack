@@ -82,17 +82,20 @@
 </template>
 
 <script>
-import NcContent                from '@nextcloud/vue/dist/Components/NcContent.js'
-import NcAppNavigation          from '@nextcloud/vue/dist/Components/NcAppNavigation.js'
-import NcAppNavigationItem      from '@nextcloud/vue/dist/Components/NcAppNavigationItem.js'
-import NcAppNavigationSettings  from '@nextcloud/vue/dist/Components/NcAppNavigationSettings.js'
-import NcAppContent             from '@nextcloud/vue/dist/Components/NcAppContent.js'
-import NcActionButton           from '@nextcloud/vue/dist/Components/NcActionButton.js'
-import NcLoadingIcon            from '@nextcloud/vue/dist/Components/NcLoadingIcon.js'
-import Pencil                   from 'vue-material-design-icons/Pencil.vue'
-import Delete                   from 'vue-material-design-icons/Delete.vue'
-import PauseIcon                from 'vue-material-design-icons/Pause.vue'
-import PlayIcon                 from 'vue-material-design-icons/Play.vue'
+import {
+    NcContent,
+    NcAppNavigation,
+    NcAppNavigationItem,
+    NcAppNavigationSettings,
+    NcAppContent,
+    NcActionButton,
+    NcLoadingIcon,
+} from '@nextcloud/vue'
+import { subscribe, unsubscribe } from '@nextcloud/event-bus'
+import Pencil   from 'vue-material-design-icons/Pencil.vue'
+import Delete   from 'vue-material-design-icons/Delete.vue'
+import PauseIcon from 'vue-material-design-icons/Pause.vue'
+import PlayIcon  from 'vue-material-design-icons/Play.vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import MonitorForm from './components/MonitorForm.vue'
 import * as api from './services/api.js'
@@ -126,13 +129,12 @@ export default {
     },
 
     async created() {
-        // Listen for refresh requests emitted by child views
-        this.$root.$on('monitors:refresh', this.loadMonitors)
+        subscribe('webtrack:monitors:refresh', this.loadMonitors)
         await Promise.all([this.loadMonitors(), this.loadTalkRooms(), this.loadSettings()])
     },
 
-    beforeDestroy() {
-        this.$root.$off('monitors:refresh', this.loadMonitors)
+    beforeUnmount() {
+        unsubscribe('webtrack:monitors:refresh', this.loadMonitors)
     },
 
     methods: {
@@ -186,7 +188,7 @@ export default {
                 const resp = await api.pauseMonitor(monitor.id, monitor.isActive)
                 const idx = this.monitors.findIndex(m => m.id === monitor.id)
                 if (idx !== -1) {
-                    this.$set(this.monitors, idx, resp.data)
+                    this.monitors[idx] = resp.data
                 }
             } catch (e) {
                 showError(this.t('webtrack', 'Failed to update monitor'))
@@ -214,7 +216,7 @@ export default {
         onSaved(monitor) {
             const idx = this.monitors.findIndex(m => m.id === monitor.id)
             if (idx !== -1) {
-                this.$set(this.monitors, idx, monitor)
+                this.monitors[idx] = monitor
             } else {
                 this.monitors.push(monitor)
                 // Navigate to the new monitor's detail
