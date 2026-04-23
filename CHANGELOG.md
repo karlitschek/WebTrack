@@ -5,6 +5,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- New `wn_monitors` columns for Google News / YouTube source type, relevance
+  scoring, and Nextcloud Tables integration (`source_type`, `source_language`,
+  `score_threshold`, `boost_keywords`, `exclude_patterns`, `tables_table_id`,
+  `tables_campaign_id`) — database migration Version1003
+- `Monitor` entity: getters/setters and `jsonSerialize()` entries for all
+  new columns; convenience helpers `getBoostKeywordsArray()` and
+  `getExcludePatternsArray()`
+- `MonitorService::applyData()` handles new fields from create/update requests
+
 ### Changed
 - Upgrade frontend from Vue 2.7 to Vue 3 and `@nextcloud/vue` 8 → 9
 - Replace `vue-router` 3 with `vue-router` 4 (hash-history mode preserved)
