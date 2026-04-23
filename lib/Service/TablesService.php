@@ -97,6 +97,29 @@ class TablesService {
         ]);
     }
 
+    /**
+     * Checks whether the given URL already appears in the Headline column of
+     * the target table.  Uses a `contains` filter on the column identified by
+     * $headlineColumnId; returns true if at least one row is found.
+     *
+     * @param int    $tableId         Table to search
+     * @param int    $headlineColumnId Column ID of the "Headline" column
+     * @param string $url             Article URL to look for
+     * @throws \RuntimeException
+     */
+    public function rowExistsForUrl(int $tableId, int $headlineColumnId, string $url): bool {
+        $rows = $this->searchRows(
+            tableId: $tableId,
+            filter: [[
+                'columnId' => $headlineColumnId,
+                'operator' => 'contains',
+                'value'    => $url,
+            ]],
+            limit: 1,
+        );
+        return count($rows) > 0;
+    }
+
     // -------------------------------------------------------------------------
     // Private HTTP helpers
     // -------------------------------------------------------------------------

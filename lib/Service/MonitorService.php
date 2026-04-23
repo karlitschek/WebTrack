@@ -267,7 +267,8 @@ class MonitorService {
     }
 
     /**
-     * Inserts a matched article as a new row in the monitor's configured table.
+     * Inserts a matched article as a new row in the monitor's configured table,
+     * unless a row with the same article URL already exists (duplicate check).
      *
      * @param array<array{id:int,title:string,type:string,selectionOptions?:array<array{id:int,label:string}>}> $columns
      */
@@ -279,6 +280,31 @@ class MonitorService {
         string  $pubDate,
     ): void {
         try {
+            // Locate the Headline column for duplicate detection.
+            $headlineCol = null;
+            foreach ($columns as $col) {
+                if (strcasecmp($col['title'], 'headline') === 0) {
+                    $headlineCol = $col;
+                    break;
+                }
+            }
+
+            // Duplicate check: skip if the URL is already in the table.
+            if ($headlineCol !== null) {
+                $isDuplicate = $this->tablesService->rowExistsForUrl(
+                    $monitor->getTablesTableId(),
+                    $headlineCol['id'],
+                    $url,
+                );
+                if ($isDuplicate) {
+                    $this->logger->debug('[webtrack] Tables row skipped (duplicate URL) for monitor {id}: {url}', [
+                        'id'  => $monitor->getId(),
+                        'url' => $url,
+                    ]);
+                    return;
+                }
+            }
+
             $data = $this->tablesRowBuilder->build(
                 columns:    $columns,
                 monitor:    $monitor,

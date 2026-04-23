@@ -6,6 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- Duplicate detection: before inserting a Tables row, `MonitorService` searches
+  the Headline column for the article URL; rows already present are skipped
+- `TablesService::rowExistsForUrl()` performs the `contains` search
 - `TablesRowBuilder`: assembles the `data` payload for a Tables row from a feed
   entry; resolves column IDs by title matching; uses `DomainLookupService` for
   Country, Tier, and Category; derives Publication from article hostname;
