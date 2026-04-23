@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `TablesService`: thin HTTP wrapper around Nextcloud Tables REST API v1
+  (`listTables`, `getTableSchema`, `getColumns`, `insertRow`, `searchRows`)
 - `DomainLookupService`: maps article URLs to Nextcloud Tables selection IDs
   for Country, Tier, and Category; seeded from ~1 500 historical PR Coverage
   rows with TLD-based fallback for unknown domains
