@@ -6,6 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `ScoringService`: scores feed entries (+1 per boost keyword, −2 per exclude
+  pattern) and gates entries below `scoreThreshold`; integrated into
+  `MonitorService::handleFeedContent()`
 - `MonitorForm`: source type selector (Custom / Google News / YouTube),
   language/region picker, relevance-score threshold, boost-keyword and
   exclude-pattern inputs, target-table picker, and Campaign pre-fill selector

@@ -22,6 +22,7 @@ class MonitorService {
         private CheckService        $checkService,
         private FeedService         $feedService,
         private SnippetService      $snippetService,
+        private ScoringService      $scoringService,
         private NotificationService $notificationService,
         private IL10N               $l,
         private LoggerInterface     $logger,
@@ -214,12 +215,27 @@ class MonitorService {
     }
 
     private function handleFeedContent(Monitor $monitor, string $content): void {
-        $entries = $this->feedService->parseEntries($content);
+        $entries    = $this->feedService->parseEntries($content);
         $newEntries = $this->feedService->filterNewEntries($monitor->getId(), $entries);
 
         foreach ($newEntries as $entry) {
-            $combined = $entry['title'] . ' ' . strip_tags($entry['content']);
-            $snippet  = $this->snippetService->findSnippet($combined, $monitor->getKeyword(), $monitor->getUseRegex());
+            $url     = $entry['id'];   // feed entry ID is typically the article URL
+            $title   = $entry['title'];
+            $body    = $entry['content'];
+            $combined = $title . ' ' . strip_tags($body);
+
+            // Relevance filter: only applied for non-custom source types or when
+            // the monitor has a non-zero threshold / non-empty boost/exclude lists.
+            if ($monitor->getSourceType() !== 'custom' || $monitor->getScoreThreshold() > 0) {
+                if (!$this->scoringService->isRelevant($monitor, $url, $title, $body)) {
+                    $this->logger->debug('[webtrack] feed entry skipped (score too low): {title}', [
+                        'title' => mb_substr($title, 0, 80),
+                    ]);
+                    continue;
+                }
+            }
+
+            $snippet = $this->snippetService->findSnippet($combined, $monitor->getKeyword(), $monitor->getUseRegex());
             if ($snippet !== null) {
                 $monitor->setLastFoundAt((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
                 $monitor->setStatus('found');
