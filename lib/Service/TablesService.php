@@ -9,19 +9,19 @@ use OCP\IURLGenerator;
 use Psr\Log\LoggerInterface;
 
 /**
- * Thin wrapper around the Nextcloud Tables REST API v1.
+ * Adapter for the Nextcloud Tables app.
  *
- * Talks to the *same* Nextcloud instance via its internal base URL so we
- * never need to know the public hostname at runtime.  Authentication uses the
- * currently-logged-in user's session (cookie forwarded automatically by
- * IClientService) when called from a controller, or an OCS-share token when
- * called from a background job.
+ * Preferred path: call the Tables PHP services directly via \OCP\Server::get().
+ * This works in both web (controller) and CLI contexts without any HTTP auth.
  *
- * All public methods throw \RuntimeException on network/HTTP failure and
- * return decoded PHP arrays on success.
+ * Fallback path: HTTP to the Tables REST API v1.  This only works when the
+ * caller already has a valid session (never works from background jobs or CLI).
+ *
+ * All public methods throw \RuntimeException on failure and return decoded PHP
+ * arrays on success.
  */
 class TablesService {
-    /** @var string Cached Tables API base URL */
+    /** @var string Cached Tables API base URL (HTTP fallback only) */
     private string $apiBase = '';
 
     public function __construct(
@@ -34,6 +34,60 @@ class TablesService {
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
+
+    /**
+     * Returns all Tables the given user can access.
+     *
+     * Tries the Tables PHP service first (works in all contexts); falls back to
+     * the HTTP REST API if the PHP class is unavailable.
+     *
+     * @return array<array{id:int,title:string,emoji:string}>
+     * @throws \RuntimeException
+     */
+    public function listTablesForUser(string $userId): array {
+        if (class_exists('\OCA\Tables\Service\TableService')) {
+            try {
+                /** @var \OCA\Tables\Service\TableService $svc */
+                $svc = \OCP\Server::get(\OCA\Tables\Service\TableService::class);
+                $tables = $svc->findAll($userId);
+                return array_map(static fn($t) => [
+                    'id'    => $t->getId(),
+                    'title' => $t->getTitle(),
+                    'emoji' => $t->getEmoji() ?? '',
+                ], $tables);
+            } catch (\Throwable $e) {
+                $this->logger->warning('[webtrack] Tables PHP API (list) failed, trying HTTP: ' . $e->getMessage());
+            }
+        }
+        return $this->listTables();
+    }
+
+    /**
+     * Returns columns for the given table, accessible by $userId.
+     *
+     * Tries the Tables PHP service first; falls back to HTTP.
+     *
+     * @return array<array{id:int,title:string,type:string,subtype:string}>
+     * @throws \RuntimeException
+     */
+    public function getColumnsForUser(int $tableId, string $userId): array {
+        if (class_exists('\OCA\Tables\Service\ColumnService')) {
+            try {
+                /** @var \OCA\Tables\Service\ColumnService $svc */
+                $svc = \OCP\Server::get(\OCA\Tables\Service\ColumnService::class);
+                $columns = $svc->findAllByTable($tableId, $userId);
+                return array_map(static fn($c) => [
+                    'id'      => $c->getId(),
+                    'title'   => $c->getTitle(),
+                    'type'    => $c->getType(),
+                    'subtype' => $c->getSubtype() ?? '',
+                ], $columns);
+            } catch (\Throwable $e) {
+                $this->logger->warning('[webtrack] Tables PHP API (columns) failed, trying HTTP: ' . $e->getMessage());
+            }
+        }
+        return $this->getColumns($tableId);
+    }
 
     /**
      * Returns all Tables the authenticated user can access.

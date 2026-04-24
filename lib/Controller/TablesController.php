@@ -10,6 +10,7 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
+use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -26,6 +27,7 @@ class TablesController extends Controller {
         IRequest $request,
         private IAppManager     $appManager,
         private TablesService   $tablesService,
+        private IUserSession    $userSession,
         private LoggerInterface $logger,
     ) {
         parent::__construct($appName, $request);
@@ -41,8 +43,9 @@ class TablesController extends Controller {
             return new JSONResponse([]);
         }
 
+        $userId = $this->userSession->getUser()?->getUID() ?? '';
         try {
-            return new JSONResponse($this->tablesService->listTables());
+            return new JSONResponse($this->tablesService->listTablesForUser($userId));
         } catch (\Throwable $e) {
             $this->logger->warning('[webtrack] Could not list Tables: ' . $e->getMessage());
             return new JSONResponse([]);
@@ -61,8 +64,9 @@ class TablesController extends Controller {
             return new JSONResponse([]);
         }
 
+        $userId = $this->userSession->getUser()?->getUID() ?? '';
         try {
-            return new JSONResponse($this->tablesService->getColumns($id));
+            return new JSONResponse($this->tablesService->getColumnsForUser($id, $userId));
         } catch (\Throwable $e) {
             $this->logger->warning('[webtrack] Could not get columns for table ' . $id . ': ' . $e->getMessage());
             return new JSONResponse([]);
