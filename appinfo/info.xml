@@ -21,6 +21,11 @@ When a keyword appears, you receive a Nextcloud notification and optionally a me
             <icon>app.svg</icon>
         </navigation>
     </navigations>
+    <commands>
+        <command>OCA\WebTrack\Command\CheckMonitors</command>
+        <command>OCA\WebTrack\Command\TestTables</command>
+        <command>OCA\WebTrack\Command\ScoreUrl</command>
+    </commands>
     <background-jobs>
         <job>OCA\WebTrack\BackgroundJob\CheckMonitorsJob</job>
         <job>OCA\WebTrack\BackgroundJob\PurgeHistoryJob</job>
