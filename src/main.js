@@ -10,4 +10,4 @@ const app = createApp(App)
 app.config.globalProperties.t = translate
 app.config.globalProperties.n = translatePlural
 
-app.use(router).mount('#webtrack-root')
+app.use(router).mount('#content')

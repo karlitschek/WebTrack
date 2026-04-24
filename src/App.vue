@@ -1,6 +1,10 @@
 <template>
-    <NcContent app-name="webtrack">
-        <NcAppNavigation>
+    <!-- Mount directly to #content; NcContent is intentionally omitted.
+         NcContent would create a second "content app-webtrack" flex root
+         nested inside #content, breaking the Nextcloud layout. Instead we
+         render NcAppNavigation + NcAppContent as direct flex children of
+         #content (Vue 3 fragment — multiple root elements). -->
+    <NcAppNavigation>
             <template #list>
                 <NcAppNavigationItem
                     :name="t('webtrack', 'New monitor')"
@@ -68,22 +72,20 @@
             </template>
         </NcAppNavigation>
 
-        <NcAppContent>
-            <router-view />
-        </NcAppContent>
+    <NcAppContent>
+        <router-view />
+    </NcAppContent>
 
-        <!-- Global create / edit form -->
-        <MonitorForm v-if="formOpen"
-            :monitor="editingMonitor"
-            :talk-rooms="talkRooms"
-            @saved="onSaved"
-            @close="formOpen = false" />
-    </NcContent>
+    <!-- Global create / edit form -->
+    <MonitorForm v-if="formOpen"
+        :monitor="editingMonitor"
+        :talk-rooms="talkRooms"
+        @saved="onSaved"
+        @close="formOpen = false" />
 </template>
 
 <script>
 import {
-    NcContent,
     NcAppNavigation,
     NcAppNavigationItem,
     NcAppNavigationSettings,
@@ -103,7 +105,6 @@ import * as api from './services/api.js'
 export default {
     name: 'WebTrackApp',
     components: {
-        NcContent,
         NcAppNavigation,
         NcAppNavigationItem,
         NcAppNavigationSettings,

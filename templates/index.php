@@ -4,4 +4,4 @@
 \OCP\Util::addScript('webtrack', 'webtrack-main');
 \OCP\Util::addStyle('webtrack', 'webtrack-main');
 ?>
-<div id="webtrack-root"></div>
+<!-- WebTrack mounts directly to #content via main.js -->
