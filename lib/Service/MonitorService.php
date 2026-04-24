@@ -153,9 +153,17 @@ class MonitorService {
         }
     }
 
-    private function executeCheck(Monitor $monitor): void {
-        // Respect per-monitor interval
-        if ($monitor->getLastCheckAt() !== null) {
+    /**
+     * Public entry point for the occ command: runs one check immediately,
+     * ignoring the per-monitor interval gate.
+     */
+    public function runCheckForMonitor(Monitor $monitor): void {
+        $this->executeCheck($monitor, ignoreInterval: true);
+    }
+
+    private function executeCheck(Monitor $monitor, bool $ignoreInterval = false): void {
+        // Respect per-monitor interval (unless called from CLI with --force)
+        if (!$ignoreInterval && $monitor->getLastCheckAt() !== null) {
             $lastCheck = new \DateTimeImmutable($monitor->getLastCheckAt());
             $due       = $lastCheck->modify('+' . $monitor->getCheckInterval() . ' minutes');
             if ($due > new \DateTimeImmutable()) {

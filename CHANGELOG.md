@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `occ webtrack:check` — run monitor checks now; `--monitor-id`, `--user`,
+  `--debug` (per-entry score + keyword match), `--dry-run`
+- `occ webtrack:test-tables` — dry-run Tables row insertion; `--list-tables`,
+  `--check-dup`, `--insert`; shows domain-lookup results and full payload
+- `occ webtrack:score-url` — score a URL against a monitor's boost/exclude
+  rules with per-rule breakdown
+- `MonitorMapper::find(int $id)` — admin-level lookup by ID for CLI use
+- `MonitorService::runCheckForMonitor()` — public entry point that bypasses
+  the interval gate (used by `occ webtrack:check`)
 - Duplicate detection: before inserting a Tables row, `MonitorService` searches
   the Headline column for the article URL; rows already present are skipped
 - `TablesService::rowExistsForUrl()` performs the `contains` search
