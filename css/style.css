@@ -1,11 +1,6 @@
 /* WebTrack global styles */
 
 /* ---- Fix Nextcloud icon-* classes inside #icon slots --------------------- */
-
-#content.app-webtrack {
-    margin: 0;
-}
-
 [class^="icon-"],
 [class*=" icon-"] {
     min-width: 20px;

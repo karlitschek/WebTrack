@@ -1,18 +1,13 @@
 import '../css/style.css'
-import Vue from 'vue'
+import { createApp } from 'vue'
+import { translate, translatePlural } from '@nextcloud/l10n'
 import App from './App.vue'
 import router from './router.js'
-import { translate, translatePlural } from '@nextcloud/l10n'
 
-// Make l10n helpers available on all components
-Vue.prototype.t  = translate
-Vue.prototype.n  = translatePlural
+const app = createApp(App)
 
-// Suppress Vue production tip
-Vue.config.productionTip = false
+// Make l10n helpers available on all components via this.t() / this.n()
+app.config.globalProperties.t = translate
+app.config.globalProperties.n = translatePlural
 
-new Vue({
-    el: '#app-content-vue',
-    router,
-    render: h => h(App),
-})
+app.use(router).mount('#content')

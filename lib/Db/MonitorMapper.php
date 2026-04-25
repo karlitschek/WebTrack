@@ -27,6 +27,18 @@ class MonitorMapper extends QBMapper {
         return $this->findEntities($qb);
     }
 
+    /**
+     * Finds a monitor by ID regardless of owner — used by CLI commands.
+     * @throws DoesNotExistException
+     */
+    public function find(int $id): Monitor {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)));
+        return $this->findEntity($qb);
+    }
+
     /** @throws DoesNotExistException */
     public function findByIdAndUser(int $id, string $userId): Monitor {
         $qb = $this->db->getQueryBuilder();

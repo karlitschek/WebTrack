@@ -1,6 +1,10 @@
 <template>
-    <NcContent app-name="webtrack">
-        <NcAppNavigation>
+    <!-- Mount directly to #content; NcContent is intentionally omitted.
+         NcContent would create a second "content app-webtrack" flex root
+         nested inside #content, breaking the Nextcloud layout. Instead we
+         render NcAppNavigation + NcAppContent as direct flex children of
+         #content (Vue 3 fragment — multiple root elements). -->
+    <NcAppNavigation>
             <template #list>
                 <NcAppNavigationItem
                     :name="t('webtrack', 'New monitor')"
@@ -23,8 +27,11 @@
                         <span class="wn-nav-dot" :class="'wn-nav-dot--' + monitor.status" />
                     </template>
                     <template #counter>
-                        <span v-if="monitor.lastCheckAt" class="wn-nav-time">
-                            {{ timeAgo(monitor.lastCheckAt) }}
+                        <span class="wn-nav-meta">
+                            <span class="wn-nav-source">{{ sourceLabel(monitor.sourceType) }}</span>
+                            <span v-if="monitor.lastCheckAt" class="wn-nav-time">
+                                {{ timeAgo(monitor.lastCheckAt) }}
+                            </span>
                         </span>
                     </template>
                     <template #actions>
@@ -63,36 +70,55 @@
                             style="color:var(--color-text-maxcontrast); font-size:0.85em; margin:4px 0 0;">
                             {{ t('webtrack', 'Install Nextcloud Talk to enable room notifications.') }}
                         </p>
+
+                        <div class="wn-form-row" style="margin-top:12px;">
+                            <label>{{ t('webtrack', 'YouTube Data API v3 key') }}</label>
+                            <input v-model.trim="youtubeApiKeyInput" type="password"
+                                autocomplete="off"
+                                :placeholder="settings.youtubeApiKeySet
+                                    ? t('webtrack', '(key saved — enter new key to replace)')
+                                    : t('webtrack', 'AIza…')" />
+                            <span style="font-size:0.8em; color:var(--color-text-maxcontrast); margin-top:2px; display:block;">
+                                {{ t('webtrack', 'Required for "YouTube — search all" monitors.') }}
+                                <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com"
+                                    target="_blank" rel="noopener">{{ t('webtrack', 'Get a key') }}</a>
+                            </span>
+                        </div>
+                        <button v-if="youtubeApiKeyInput" style="margin-top:4px;" @click="saveYouTubeApiKey">
+                            {{ t('webtrack', 'Save API key') }}
+                        </button>
                     </div>
                 </NcAppNavigationSettings>
             </template>
         </NcAppNavigation>
 
-        <NcAppContent>
-            <router-view />
-        </NcAppContent>
+    <NcAppContent>
+        <router-view />
+    </NcAppContent>
 
-        <!-- Global create / edit form -->
-        <MonitorForm v-if="formOpen"
-            :monitor="editingMonitor"
-            :talk-rooms="talkRooms"
-            @saved="onSaved"
-            @close="formOpen = false" />
-    </NcContent>
+    <!-- Global create / edit form -->
+    <MonitorForm v-if="formOpen"
+        :monitor="editingMonitor"
+        :talk-rooms="talkRooms"
+        :youtube-api-key-set="settings.youtubeApiKeySet"
+        @saved="onSaved"
+        @close="formOpen = false" />
 </template>
 
 <script>
-import NcContent                from '@nextcloud/vue/dist/Components/NcContent.js'
-import NcAppNavigation          from '@nextcloud/vue/dist/Components/NcAppNavigation.js'
-import NcAppNavigationItem      from '@nextcloud/vue/dist/Components/NcAppNavigationItem.js'
-import NcAppNavigationSettings  from '@nextcloud/vue/dist/Components/NcAppNavigationSettings.js'
-import NcAppContent             from '@nextcloud/vue/dist/Components/NcAppContent.js'
-import NcActionButton           from '@nextcloud/vue/dist/Components/NcActionButton.js'
-import NcLoadingIcon            from '@nextcloud/vue/dist/Components/NcLoadingIcon.js'
-import Pencil                   from 'vue-material-design-icons/Pencil.vue'
-import Delete                   from 'vue-material-design-icons/Delete.vue'
-import PauseIcon                from 'vue-material-design-icons/Pause.vue'
-import PlayIcon                 from 'vue-material-design-icons/Play.vue'
+import {
+    NcAppNavigation,
+    NcAppNavigationItem,
+    NcAppNavigationSettings,
+    NcAppContent,
+    NcActionButton,
+    NcLoadingIcon,
+} from '@nextcloud/vue'
+import { subscribe, unsubscribe } from '@nextcloud/event-bus'
+import Pencil   from 'vue-material-design-icons/Pencil.vue'
+import Delete   from 'vue-material-design-icons/Delete.vue'
+import PauseIcon from 'vue-material-design-icons/Pause.vue'
+import PlayIcon  from 'vue-material-design-icons/Play.vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import MonitorForm from './components/MonitorForm.vue'
 import * as api from './services/api.js'
@@ -100,7 +126,6 @@ import * as api from './services/api.js'
 export default {
     name: 'WebTrackApp',
     components: {
-        NcContent,
         NcAppNavigation,
         NcAppNavigationItem,
         NcAppNavigationSettings,
@@ -117,22 +142,22 @@ export default {
     data() {
         return {
             monitors:       [],
-            talkRooms:      [],
-            settings:       { defaultTalkRoomToken: '' },
-            loading:        true,
-            formOpen:       false,
-            editingMonitor: null,
+            talkRooms:          [],
+            settings:           { defaultTalkRoomToken: '', youtubeApiKeySet: false },
+            youtubeApiKeyInput: '',
+            loading:            true,
+            formOpen:           false,
+            editingMonitor:     null,
         }
     },
 
     async created() {
-        // Listen for refresh requests emitted by child views
-        this.$root.$on('monitors:refresh', this.loadMonitors)
+        subscribe('webtrack:monitors:refresh', this.loadMonitors)
         await Promise.all([this.loadMonitors(), this.loadTalkRooms(), this.loadSettings()])
     },
 
-    beforeDestroy() {
-        this.$root.$off('monitors:refresh', this.loadMonitors)
+    beforeUnmount() {
+        unsubscribe('webtrack:monitors:refresh', this.loadMonitors)
     },
 
     methods: {
@@ -171,6 +196,17 @@ export default {
             }
         },
 
+        async saveYouTubeApiKey() {
+            try {
+                await api.saveSettings({ youtubeApiKey: this.youtubeApiKeyInput })
+                this.settings.youtubeApiKeySet = true
+                this.youtubeApiKeyInput = ''
+                showSuccess(this.t('webtrack', 'YouTube API key saved'))
+            } catch (e) {
+                showError(this.t('webtrack', 'Failed to save YouTube API key'))
+            }
+        },
+
         openCreate() {
             this.editingMonitor = null
             this.formOpen = true
@@ -186,7 +222,7 @@ export default {
                 const resp = await api.pauseMonitor(monitor.id, monitor.isActive)
                 const idx = this.monitors.findIndex(m => m.id === monitor.id)
                 if (idx !== -1) {
-                    this.$set(this.monitors, idx, resp.data)
+                    this.monitors[idx] = resp.data
                 }
             } catch (e) {
                 showError(this.t('webtrack', 'Failed to update monitor'))
@@ -214,13 +250,26 @@ export default {
         onSaved(monitor) {
             const idx = this.monitors.findIndex(m => m.id === monitor.id)
             if (idx !== -1) {
-                this.$set(this.monitors, idx, monitor)
+                this.monitors[idx] = monitor
             } else {
                 this.monitors.push(monitor)
-                // Navigate to the new monitor's detail
                 this.$router.push('/monitors/' + monitor.id)
+                // Kick off an immediate check without blocking the UI.
+                // When it resolves, replace the monitor in the list so the
+                // nav dot and lastCheckAt reflect the real status right away.
+                api.checkNow(monitor.id).then(resp => {
+                    const i = this.monitors.findIndex(m => m.id === monitor.id)
+                    if (i !== -1) this.monitors[i] = resp.data
+                }).catch(() => { /* ignore — background job will retry later */ })
             }
             this.formOpen = false
+        },
+
+        sourceLabel(sourceType) {
+            if (sourceType === 'google_news')    return 'GNews'
+            if (sourceType === 'youtube')        return 'YT channel'
+            if (sourceType === 'youtube_search') return 'YouTube'
+            return 'URL'
         },
 
         timeAgo(iso) {
@@ -241,5 +290,21 @@ export default {
 <style scoped>
 .wn-settings-content {
     padding: 4px 0 8px;
+}
+
+/* Two-line counter: source type badge + last-checked time */
+.wn-nav-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    line-height: 1.2;
+}
+.wn-nav-source {
+    font-size: 0.7em;
+    font-weight: 600;
+    color: var(--color-primary-element);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 </style>

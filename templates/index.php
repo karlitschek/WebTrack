@@ -4,4 +4,4 @@
 \OCP\Util::addScript('webtrack', 'webtrack-main');
 \OCP\Util::addStyle('webtrack', 'webtrack-main');
 ?>
-<div id="app-content-vue"></div>
+<!-- WebTrack mounts directly to #content via main.js -->

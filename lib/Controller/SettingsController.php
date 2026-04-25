@@ -24,9 +24,12 @@ class SettingsController extends Controller {
 
     #[NoAdminRequired]
     public function show(): JSONResponse {
-        $uid = $this->userId ?? '';
+        $uid    = $this->userId ?? '';
+        $apiKey = $this->config->getUserValue($uid, Application::APP_ID, 'youtube_api_key', '');
         return new JSONResponse([
             'defaultTalkRoomToken' => $this->config->getUserValue($uid, Application::APP_ID, 'default_talk_room', ''),
+            // Return a masked key so the frontend can show "configured" without exposing the key
+            'youtubeApiKeySet'     => $apiKey !== '',
         ]);
     }
 
@@ -35,6 +38,13 @@ class SettingsController extends Controller {
         $uid   = $this->userId ?? '';
         $token = trim($this->request->getParam('defaultTalkRoomToken', ''));
         $this->config->setUserValue($uid, Application::APP_ID, 'default_talk_room', $token);
+
+        // Only update the API key if the request actually includes it (empty = clear it)
+        if ($this->request->offsetExists('youtubeApiKey')) {
+            $key = trim($this->request->getParam('youtubeApiKey', ''));
+            $this->config->setUserValue($uid, Application::APP_ID, 'youtube_api_key', $key);
+        }
+
         return new JSONResponse(['ok' => true]);
     }
 }

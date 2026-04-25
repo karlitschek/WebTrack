@@ -25,6 +25,9 @@ export const deleteMonitor = (id) =>
 export const pauseMonitor = (id, pause) =>
     axios.post(url(`/monitors/${id}/pause`), { pause })
 
+export const checkNow = (id) =>
+    axios.post(url(`/monitors/${id}/check`))
+
 export const testUrl = (targetUrl) =>
     axios.post(url('/monitors/test'), { url: targetUrl })
 
@@ -45,3 +48,11 @@ export const saveSettings = (settings) =>
 
 export const getTalkRooms = () =>
     axios.get(url('/talk/rooms'))
+
+// ---- Tables integration ------------------------------------------------------
+
+export const getTables = () =>
+    axios.get(url('/tables'))
+
+export const getTableColumns = (tableId) =>
+    axios.get(url(`/tables/${tableId}/columns`))
