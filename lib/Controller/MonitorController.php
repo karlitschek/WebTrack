@@ -116,8 +116,12 @@ class MonitorController extends Controller {
     private function validate(array $data): array {
         $errors = [];
         if (empty(trim($data['name'] ?? '')))    { $errors[] = $this->l->t('Name is required'); }
-        if (empty(trim($data['url'] ?? '')))     { $errors[] = $this->l->t('URL is required'); }
-        elseif (!filter_var(trim($data['url']), FILTER_VALIDATE_URL)) { $errors[] = $this->l->t('URL is invalid'); }
+        // Google News URL is auto-built from keyword; custom/youtube need an explicit URL.
+        $sourceType = $data['sourceType'] ?? 'custom';
+        if ($sourceType !== 'google_news') {
+            if (empty(trim($data['url'] ?? '')))     { $errors[] = $this->l->t('URL is required'); }
+            elseif (!filter_var(trim($data['url']), FILTER_VALIDATE_URL)) { $errors[] = $this->l->t('URL is invalid'); }
+        }
         if (empty(trim($data['keyword'] ?? ''))) { $errors[] = $this->l->t('Keyword is required'); }
         elseif (!empty($data['useRegex'])) {
             $pattern = trim($data['keyword']);

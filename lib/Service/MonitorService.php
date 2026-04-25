@@ -54,6 +54,7 @@ class MonitorService {
         $monitor = new Monitor();
         $monitor->setUserId($userId);
         $this->applyData($monitor, $data);
+        $this->applyGoogleNewsUrl($monitor);
         $monitor->setIsActive(true);
         $monitor->setIsFeed($monitor->getIsFeed());
         $monitor->setStatus('ok');
@@ -67,7 +68,59 @@ class MonitorService {
     public function update(int $id, string $userId, array $data): Monitor {
         $monitor = $this->monitorMapper->findByIdAndUser($id, $userId);
         $this->applyData($monitor, $data);
+        $this->applyGoogleNewsUrl($monitor);
         return $this->monitorMapper->update($monitor);
+    }
+
+    /**
+     * For Google News monitors, auto-builds and stores the RSS feed URL from
+     * the monitor's keyword, boostKeywords (positive terms), excludePatterns
+     * (negative terms prefixed with -), and sourceLanguage.
+     *
+     * Example: keyword="Nextcloud", boost=["github"], exclude=["reddit","forum"]
+     *   → https://news.google.com/rss/search?q=Nextcloud+github+-reddit+-forum&hl=en-US&gl=US&ceid=US:en
+     */
+    private function applyGoogleNewsUrl(Monitor $monitor): void {
+        if ($monitor->getSourceType() !== 'google_news') {
+            return;
+        }
+
+        $terms = [];
+
+        // Main keyword — always first
+        $kw = trim($monitor->getKeyword());
+        if ($kw !== '') {
+            $terms[] = $kw;
+        }
+
+        // Positive / boost keywords
+        foreach ($monitor->getBoostKeywordsArray() as $k) {
+            $k = trim($k);
+            if ($k !== '') {
+                $terms[] = $k;
+            }
+        }
+
+        // Negative keywords (prefixed with -)
+        foreach ($monitor->getExcludePatternsArray() as $k) {
+            $k = trim($k);
+            if ($k !== '') {
+                $terms[] = '-' . $k;
+            }
+        }
+
+        $q = implode('+', array_map('rawurlencode', $terms));
+
+        // Parse language tag, e.g. "en-US" → hl=en-US, gl=US, ceid=US:en
+        $lang   = $monitor->getSourceLanguage() ?: 'en-US';
+        $parts  = explode('-', $lang, 2);
+        $hl     = $lang;
+        $gl     = strtoupper($parts[1] ?? $parts[0]);
+        $ceid   = $gl . ':' . strtolower($parts[0]);
+
+        $url = "https://news.google.com/rss/search?q={$q}&hl={$hl}&gl={$gl}&ceid={$ceid}";
+        $monitor->setUrl($url);
+        $monitor->setIsFeed(true);
     }
 
     /** @throws DoesNotExistException */
