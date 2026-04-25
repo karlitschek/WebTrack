@@ -27,8 +27,11 @@
                         <span class="wn-nav-dot" :class="'wn-nav-dot--' + monitor.status" />
                     </template>
                     <template #counter>
-                        <span v-if="monitor.lastCheckAt" class="wn-nav-time">
-                            {{ timeAgo(monitor.lastCheckAt) }}
+                        <span class="wn-nav-meta">
+                            <span class="wn-nav-source">{{ sourceLabel(monitor.sourceType) }}</span>
+                            <span v-if="monitor.lastCheckAt" class="wn-nav-time">
+                                {{ timeAgo(monitor.lastCheckAt) }}
+                            </span>
                         </span>
                     </template>
                     <template #actions>
@@ -232,6 +235,12 @@ export default {
             this.formOpen = false
         },
 
+        sourceLabel(sourceType) {
+            if (sourceType === 'google_news') return 'GNews'
+            if (sourceType === 'youtube')     return 'YouTube'
+            return 'URL'
+        },
+
         timeAgo(iso) {
             if (!iso) return ''
             const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
@@ -250,5 +259,21 @@ export default {
 <style scoped>
 .wn-settings-content {
     padding: 4px 0 8px;
+}
+
+/* Two-line counter: source type badge + last-checked time */
+.wn-nav-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    line-height: 1.2;
+}
+.wn-nav-source {
+    font-size: 0.7em;
+    font-weight: 600;
+    color: var(--color-primary-element);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 </style>
