@@ -275,7 +275,7 @@ export default {
                 sourceLanguage:   m ? (m.sourceLanguage || 'en-US') : 'en-US',
                 // YouTube: channel ID extracted from stored URL on edit
                 youtubeChannelId: m ? this.extractYouTubeChannelId(m.url) : '',
-                // Relevance scoring
+                // Relevance scoring — only meaningful for custom URL monitors
                 scoreThreshold:   m ? (m.scoreThreshold ?? 2) : 2,
                 // Tables integration
                 tablesTableId:    m ? (m.tablesTableId    || null) : null,

@@ -82,12 +82,17 @@ class FeedService {
     }
 
     /**
-     * Returns only entries not yet seen. On first call (no state) returns empty
-     * array and saves all current IDs as "seen" to avoid spamming old content.
+     * On the first call (no prior state), treat the most recent entries as new
+     * so the monitor fires immediately rather than silently skipping everything.
+     * Capped at MAX_FIRST_RUN to avoid notification floods on large feeds.
+     *
+     * On subsequent calls, returns only entries whose ID has not been seen before.
      *
      * @param array<array{id:string,title:string,content:string}> $entries
      * @return array<array{id:string,title:string,content:string}>
      */
+    private const MAX_FIRST_RUN = 5;
+
     public function filterNewEntries(int $monitorId, array $entries): array {
         try {
             $state   = $this->feedStateMapper->findByMonitor($monitorId);
@@ -104,8 +109,14 @@ class FeedService {
 
         foreach ($entries as $entry) {
             $entryId = $entry['id'];
-            if (!$isFirst && !in_array($entryId, $seenIds, true)) {
-                $newEntries[] = $entry;
+            $isNew   = !in_array($entryId, $seenIds, true);
+
+            if ($isNew) {
+                // On first run: include up to MAX_FIRST_RUN of the latest entries
+                // so the monitor fires right away instead of waiting silently.
+                if (!$isFirst || count($newEntries) < self::MAX_FIRST_RUN) {
+                    $newEntries[] = $entry;
+                }
             }
             if (!in_array($entryId, $allIds, true)) {
                 $allIds[] = $entryId;

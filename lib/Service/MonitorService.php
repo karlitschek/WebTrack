@@ -189,8 +189,12 @@ class MonitorService {
             $monitor->setSourceLanguage(substr(trim($data['sourceLanguage']), 0, 10));
         }
 
-        // Relevance scoring
-        if (isset($data['scoreThreshold'])) {
+        // Relevance scoring — auto-URL sources don't use a threshold (scoring is bypassed
+        // at check time), so always store 0 for them to avoid confusion.
+        $autoUrlTypes = ['google_news', 'youtube', 'youtube_search'];
+        if (in_array($monitor->getSourceType(), $autoUrlTypes, true)) {
+            $monitor->setScoreThreshold(0);
+        } elseif (isset($data['scoreThreshold'])) {
             $monitor->setScoreThreshold(max(0, (int) $data['scoreThreshold']));
         }
         if (isset($data['boostKeywords'])) {
@@ -352,13 +356,34 @@ class MonitorService {
             $channelTitle = $entry['channelTitle'] ?? '';   // YouTube search only
             $combined     = $title . ' ' . strip_tags($body);
 
-            // Relevance filter: not applied for youtube_search (Google already ranked results)
-            if ($monitor->getSourceType() !== 'custom' && $monitor->getSourceType() !== 'youtube_search'
-                || $monitor->getScoreThreshold() > 0) {
-                if (!$this->scoringService->isRelevant($monitor, $url, $title, $body)) {
-                    $this->logger->debug('[webtrack] feed entry skipped (score too low): {title}', [
+            // Relevance filter:
+            //   - custom: apply full boost/exclude scoring against configured threshold
+            //   - google_news / youtube / youtube_search: the source already filters by
+            //     topic (URL query / API call), so we only run negative-keyword exclusion
+            //     as a safeguard and skip the score threshold entirely.
+            $sourceType = $monitor->getSourceType();
+            if ($sourceType === 'custom') {
+                if ($monitor->getScoreThreshold() > 0 && !$this->scoringService->isRelevant($monitor, $url, $title, $body)) {
+                    $this->logger->debug('[webtrack] entry skipped (score too low): {title}', [
                         'title' => mb_substr($title, 0, 80),
                     ]);
+                    continue;
+                }
+            } else {
+                // For feed/API sources: only apply negative-keyword (exclude) filtering
+                $combined = mb_strtolower($title . ' ' . $url);
+                $excluded = false;
+                foreach ($monitor->getExcludePatternsArray() as $pattern) {
+                    if ($pattern !== '' && str_contains($combined, mb_strtolower($pattern))) {
+                        $this->logger->debug('[webtrack] entry skipped (negative keyword "{p}"): {title}', [
+                            'p'     => $pattern,
+                            'title' => mb_substr($title, 0, 80),
+                        ]);
+                        $excluded = true;
+                        break;
+                    }
+                }
+                if ($excluded) {
                     continue;
                 }
             }
