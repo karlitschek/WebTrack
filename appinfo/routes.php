@@ -13,7 +13,8 @@ return [
         ['name' => 'monitor#show',   'url' => '/api/v1/monitors/{id}',    'verb' => 'GET'],
         ['name' => 'monitor#update', 'url' => '/api/v1/monitors/{id}',    'verb' => 'PUT'],
         ['name' => 'monitor#destroy','url' => '/api/v1/monitors/{id}',    'verb' => 'DELETE'],
-        ['name' => 'monitor#pause',  'url' => '/api/v1/monitors/{id}/pause', 'verb' => 'POST'],
+        ['name' => 'monitor#pause',     'url' => '/api/v1/monitors/{id}/pause', 'verb' => 'POST'],
+        ['name' => 'monitor#check_now', 'url' => '/api/v1/monitors/{id}/check', 'verb' => 'POST'],
         ['name' => 'monitor#test',   'url' => '/api/v1/monitors/test',    'verb' => 'POST'],
 
         // History

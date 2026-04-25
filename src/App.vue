@@ -220,8 +220,14 @@ export default {
                 this.monitors[idx] = monitor
             } else {
                 this.monitors.push(monitor)
-                // Navigate to the new monitor's detail
                 this.$router.push('/monitors/' + monitor.id)
+                // Kick off an immediate check without blocking the UI.
+                // When it resolves, replace the monitor in the list so the
+                // nav dot and lastCheckAt reflect the real status right away.
+                api.checkNow(monitor.id).then(resp => {
+                    const i = this.monitors.findIndex(m => m.id === monitor.id)
+                    if (i !== -1) this.monitors[i] = resp.data
+                }).catch(() => { /* ignore — background job will retry later */ })
             }
             this.formOpen = false
         },

@@ -21,6 +21,13 @@
                             <template #icon><span class="icon-rename" /></template>
                             {{ t('webtrack', 'Edit') }}
                         </NcButton>
+                        <NcButton type="secondary" :disabled="checking" @click="runCheckNow">
+                            <template #icon>
+                                <NcLoadingIcon v-if="checking" :size="20" />
+                                <Refresh v-else :size="20" />
+                            </template>
+                            {{ checking ? t('webtrack', 'Checking…') : t('webtrack', 'Check now') }}
+                        </NcButton>
                         <NcButton :type="monitor.isActive ? 'tertiary' : 'primary'" @click="togglePause">
                             <template #icon>
                                 <span :class="monitor.isActive ? 'icon-pause' : 'icon-play'" />
@@ -122,6 +129,7 @@ import ClockOutline       from 'vue-material-design-icons/ClockOutline.vue'
 import CheckCircleOutline from 'vue-material-design-icons/CheckCircleOutline.vue'
 import AlertOutline       from 'vue-material-design-icons/AlertOutline.vue'
 import LinkVariant        from 'vue-material-design-icons/LinkVariant.vue'
+import Refresh            from 'vue-material-design-icons/Refresh.vue'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import { getLocale } from '@nextcloud/l10n'
 import StatusBadge  from '../components/StatusBadge.vue'
@@ -146,6 +154,7 @@ export default {
         CheckCircleOutline,
         AlertOutline,
         LinkVariant,
+        Refresh,
     },
     props: {
         id: { type: String, required: true },
@@ -156,6 +165,7 @@ export default {
             monitor:        null,
             talkRooms:      [],
             loading:        true,
+            checking:       false,
             formOpen:       false,
             editingMonitor: null,
         }
@@ -187,6 +197,21 @@ export default {
                 const resp = await api.getTalkRooms()
                 this.talkRooms = resp.data
             } catch (e) { /* Talk not installed */ }
+        },
+
+        async runCheckNow() {
+            this.checking = true
+            try {
+                const resp = await api.checkNow(this.monitor.id)
+                this.monitor = resp.data
+                emit('webtrack:monitors:refresh')
+                this.$nextTick(() => { this.$refs.history?.load() })
+                showSuccess(this.t('webtrack', 'Check complete'))
+            } catch (e) {
+                showError(this.t('webtrack', 'Check failed'))
+            } finally {
+                this.checking = false
+            }
         },
 
         openEdit() {

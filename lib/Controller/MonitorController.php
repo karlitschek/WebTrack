@@ -85,6 +85,25 @@ class MonitorController extends Controller {
         }
     }
 
+    /**
+     * Runs a check for the given monitor immediately, ignoring the interval gate.
+     * Returns the updated monitor after the check completes.
+     */
+    #[NoAdminRequired]
+    public function checkNow(int $id): JSONResponse {
+        try {
+            $monitor = $this->monitorService->getForUser($id, $this->userId ?? '');
+            $this->monitorService->runCheckForMonitor($monitor);
+            // Reload from DB to pick up status/lastCheckAt changes
+            $monitor = $this->monitorService->getForUser($id, $this->userId ?? '');
+            return new JSONResponse($monitor->jsonSerialize());
+        } catch (DoesNotExistException) {
+            return new JSONResponse(['error' => $this->l->t('Not found')], Http::STATUS_NOT_FOUND);
+        } catch (\Throwable $e) {
+            return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_GATEWAY);
+        }
+    }
+
     #[NoAdminRequired]
     public function pause(int $id): JSONResponse {
         try {
