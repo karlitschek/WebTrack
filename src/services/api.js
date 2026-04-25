@@ -45,3 +45,11 @@ export const saveSettings = (settings) =>
 
 export const getTalkRooms = () =>
     axios.get(url('/talk/rooms'))
+
+// ---- Tables integration ------------------------------------------------------
+
+export const getTables = () =>
+    axios.get(url('/tables'))
+
+export const getTableColumns = (tableId) =>
+    axios.get(url(`/tables/${tableId}/columns`))
