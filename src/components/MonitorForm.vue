@@ -11,8 +11,9 @@
                     <label for="wn-source-type">{{ t('webtrack', 'Source type') }}</label>
                     <select id="wn-source-type" v-model="form.sourceType" @change="onSourceTypeChange">
                         <option value="google_news">{{ t('webtrack', 'Google News RSS') }}</option>
+                        <option value="youtube_search">{{ t('webtrack', 'YouTube — search all') }}</option>
+                        <option value="youtube">{{ t('webtrack', 'YouTube — single channel') }}</option>
                         <option value="custom">{{ t('webtrack', 'Custom URL') }}</option>
-                        <option value="youtube">{{ t('webtrack', 'YouTube') }}</option>
                     </select>
                 </div>
 
@@ -37,7 +38,17 @@
                     </select>
                 </div>
 
-                <!-- Channel ID — YouTube only -->
+                <!-- YouTube search — API key warning -->
+                <div v-if="form.sourceType === 'youtube_search'" class="wn-form-row">
+                    <p v-if="!youtubeApiKeySet" class="wn-error-text">
+                        {{ t('webtrack', 'A YouTube Data API v3 key is required. Add it in Settings below.') }}
+                    </p>
+                    <p v-else class="wn-form-hint wn-form-hint--success">
+                        {{ t('webtrack', '✓ YouTube API key configured') }}
+                    </p>
+                </div>
+
+                <!-- Channel ID — single-channel YouTube only -->
                 <div v-if="form.sourceType === 'youtube'" class="wn-form-row">
                     <label for="wn-yt-channel">{{ t('webtrack', 'Channel ID') }} *</label>
                     <input id="wn-yt-channel" v-model.trim="form.youtubeChannelId" type="text"
@@ -242,8 +253,9 @@ export default {
     name: 'MonitorForm',
     components: { NcModal, NcButton },
     props: {
-        monitor:   { type: Object, default: null },
-        talkRooms: { type: Array, default: () => [] },
+        monitor:          { type: Object,  default: null },
+        talkRooms:        { type: Array,   default: () => [] },
+        youtubeApiKeySet: { type: Boolean, default: false },
     },
     emits: ['saved', 'close'],
 
@@ -302,7 +314,7 @@ export default {
         },
         /** True for source types where the URL is auto-built (no manual URL field). */
         isAutoUrl() {
-            return this.form.sourceType === 'google_news' || this.form.sourceType === 'youtube'
+            return ['google_news', 'youtube', 'youtube_search'].includes(this.form.sourceType)
         },
         /** Live preview of the auto-built feed URL (Google News or YouTube). */
         feedPreviewUrl() {
@@ -326,6 +338,11 @@ export default {
                 const ch = this.form.youtubeChannelId.trim()
                 if (!ch) return ''
                 return `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(ch)}`
+            }
+            if (type === 'youtube_search') {
+                const kw = this.form.keyword.trim()
+                if (!kw) return ''
+                return `YouTube Data API v3 — search: "${kw}"`
             }
             return ''
         },
@@ -410,6 +427,7 @@ export default {
             if (this.form.sourceType === 'youtube' && !this.form.youtubeChannelId) {
                 errs.push(this.t('webtrack', 'Channel ID is required'))
             }
+            // youtube_search: keyword is the search query, no URL or channel ID needed
             if (!this.form.keyword) errs.push(this.t('webtrack', 'Keyword is required'))
             return errs
         },

@@ -26,6 +26,7 @@ class MonitorService {
         private TablesService       $tablesService,
         private TablesRowBuilder    $tablesRowBuilder,
         private NotificationService $notificationService,
+        private YouTubeService      $youtubeService,
         private IL10N               $l,
         private LoggerInterface     $logger,
     ) {
@@ -180,7 +181,7 @@ class MonitorService {
 
         // Source configuration
         if (isset($data['sourceType'])) {
-            $allowed = ['custom', 'google_news', 'youtube'];
+            $allowed = ['custom', 'google_news', 'youtube', 'youtube_search'];
             $type    = in_array($data['sourceType'], $allowed, true) ? $data['sourceType'] : 'custom';
             $monitor->setSourceType($type);
         }
@@ -252,8 +253,14 @@ class MonitorService {
         $monitor->setLastCheckAt($now);
 
         try {
-            $content = $this->checkService->fetch($monitor->getUrl());
-            $this->handleSuccess($monitor, $content);
+            if ($monitor->getSourceType() === 'youtube_search') {
+                $apiKey  = $this->youtubeService->getApiKey($monitor->getUserId());
+                $entries = $this->youtubeService->search($monitor->getKeyword(), $apiKey);
+                $this->handleSuccess($monitor, null, $entries);
+            } else {
+                $content = $this->checkService->fetch($monitor->getUrl());
+                $this->handleSuccess($monitor, $content);
+            }
         } catch (\Throwable $e) {
             $this->handleCheckError($monitor, $e->getMessage());
         }
@@ -261,7 +268,11 @@ class MonitorService {
         $this->monitorMapper->update($monitor);
     }
 
-    private function handleSuccess(Monitor $monitor, string $content): void {
+    /**
+     * @param array<array<string,string>>|null $preloadedEntries  Pre-fetched entries
+     *        (YouTube search); when null, $content is parsed as feed or web page.
+     */
+    private function handleSuccess(Monitor $monitor, ?string $content, ?array $preloadedEntries = null): void {
         // Reset error streak on success
         if ($monitor->getConsecutiveErrors() > 0) {
             $monitor->setConsecutiveErrors(0);
@@ -271,10 +282,14 @@ class MonitorService {
             $monitor->setStatus('ok');
         }
 
-        if ($monitor->getIsFeed()) {
-            $this->handleFeedContent($monitor, $content);
+        if ($preloadedEntries !== null) {
+            // YouTube search — entries already fetched and normalised
+            $new = $this->feedService->filterNewEntries($monitor->getId(), $preloadedEntries);
+            $this->processNewEntries($monitor, $new);
+        } elseif ($monitor->getIsFeed()) {
+            $this->handleFeedContent($monitor, $content ?? '');
         } else {
-            $this->handleWebContent($monitor, $content);
+            $this->handleWebContent($monitor, $content ?? '');
         }
     }
 
@@ -304,7 +319,18 @@ class MonitorService {
     private function handleFeedContent(Monitor $monitor, string $content): void {
         $entries    = $this->feedService->parseEntries($content);
         $newEntries = $this->feedService->filterNewEntries($monitor->getId(), $entries);
+        $this->processNewEntries($monitor, $newEntries);
+    }
 
+    /**
+     * Core entry-processing loop shared by RSS/Atom feeds and YouTube search.
+     *
+     * Each entry must have at minimum: id, title, content, pubDate.
+     * YouTube search entries also carry channelTitle and channelId.
+     *
+     * @param array<array<string,string>> $newEntries
+     */
+    private function processNewEntries(Monitor $monitor, array $newEntries): void {
         // Fetch the Tables column schema once (if configured) to avoid N requests.
         $tableColumns = [];
         if ($monitor->getTablesTableId() !== null) {
@@ -319,15 +345,16 @@ class MonitorService {
         }
 
         foreach ($newEntries as $entry) {
-            $url     = $entry['id'];   // feed entry ID is typically the article URL
-            $title   = $entry['title'];
-            $body    = $entry['content'];
-            $pubDate = $entry['pubDate'] ?? '';
-            $combined = $title . ' ' . strip_tags($body);
+            $url          = $entry['id'];
+            $title        = $entry['title'];
+            $body         = $entry['content'];
+            $pubDate      = $entry['pubDate']      ?? '';
+            $channelTitle = $entry['channelTitle'] ?? '';   // YouTube search only
+            $combined     = $title . ' ' . strip_tags($body);
 
-            // Relevance filter: only applied for non-custom source types or when
-            // the monitor has a non-zero threshold / non-empty boost/exclude lists.
-            if ($monitor->getSourceType() !== 'custom' || $monitor->getScoreThreshold() > 0) {
+            // Relevance filter: not applied for youtube_search (Google already ranked results)
+            if ($monitor->getSourceType() !== 'custom' && $monitor->getSourceType() !== 'youtube_search'
+                || $monitor->getScoreThreshold() > 0) {
                 if (!$this->scoringService->isRelevant($monitor, $url, $title, $body)) {
                     $this->logger->debug('[webtrack] feed entry skipped (score too low): {title}', [
                         'title' => mb_substr($title, 0, 80),
@@ -343,9 +370,8 @@ class MonitorService {
                 $this->notificationService->notifyFound($monitor, $snippet);
                 $this->logEvent($monitor, 'found', $snippet);
 
-                // Write to Nextcloud Tables when configured.
                 if ($monitor->getTablesTableId() !== null && $tableColumns !== []) {
-                    $this->insertTablesRow($monitor, $tableColumns, $url, $title, $pubDate);
+                    $this->insertTablesRow($monitor, $tableColumns, $url, $title, $pubDate, $channelTitle);
                 }
             }
         }
@@ -363,6 +389,7 @@ class MonitorService {
         string  $url,
         string  $title,
         string  $pubDate,
+        string  $channelTitle = '',
     ): void {
         try {
             // Locate the Headline column for duplicate detection.
@@ -391,12 +418,13 @@ class MonitorService {
             }
 
             $data = $this->tablesRowBuilder->build(
-                columns:    $columns,
-                monitor:    $monitor,
-                entryUrl:   $url,
-                title:      $title,
-                pubDate:    $pubDate,
-                campaignId: $monitor->getTablesCampaignId(),
+                columns:      $columns,
+                monitor:      $monitor,
+                entryUrl:     $url,
+                title:        $title,
+                pubDate:      $pubDate,
+                campaignId:   $monitor->getTablesCampaignId(),
+                channelTitle: $channelTitle,
             );
             $this->tablesService->insertRow($monitor->getTablesTableId(), $data);
             $this->logger->info('[webtrack] Tables row inserted for monitor {id}: {title}', [

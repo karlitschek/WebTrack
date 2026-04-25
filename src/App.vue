@@ -70,6 +70,23 @@
                             style="color:var(--color-text-maxcontrast); font-size:0.85em; margin:4px 0 0;">
                             {{ t('webtrack', 'Install Nextcloud Talk to enable room notifications.') }}
                         </p>
+
+                        <div class="wn-form-row" style="margin-top:12px;">
+                            <label>{{ t('webtrack', 'YouTube Data API v3 key') }}</label>
+                            <input v-model.trim="youtubeApiKeyInput" type="password"
+                                autocomplete="off"
+                                :placeholder="settings.youtubeApiKeySet
+                                    ? t('webtrack', '(key saved — enter new key to replace)')
+                                    : t('webtrack', 'AIza…')" />
+                            <span style="font-size:0.8em; color:var(--color-text-maxcontrast); margin-top:2px; display:block;">
+                                {{ t('webtrack', 'Required for "YouTube — search all" monitors.') }}
+                                <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com"
+                                    target="_blank" rel="noopener">{{ t('webtrack', 'Get a key') }}</a>
+                            </span>
+                        </div>
+                        <button v-if="youtubeApiKeyInput" style="margin-top:4px;" @click="saveYouTubeApiKey">
+                            {{ t('webtrack', 'Save API key') }}
+                        </button>
                     </div>
                 </NcAppNavigationSettings>
             </template>
@@ -83,6 +100,7 @@
     <MonitorForm v-if="formOpen"
         :monitor="editingMonitor"
         :talk-rooms="talkRooms"
+        :youtube-api-key-set="settings.youtubeApiKeySet"
         @saved="onSaved"
         @close="formOpen = false" />
 </template>
@@ -124,11 +142,12 @@ export default {
     data() {
         return {
             monitors:       [],
-            talkRooms:      [],
-            settings:       { defaultTalkRoomToken: '' },
-            loading:        true,
-            formOpen:       false,
-            editingMonitor: null,
+            talkRooms:          [],
+            settings:           { defaultTalkRoomToken: '', youtubeApiKeySet: false },
+            youtubeApiKeyInput: '',
+            loading:            true,
+            formOpen:           false,
+            editingMonitor:     null,
         }
     },
 
@@ -174,6 +193,17 @@ export default {
                 showSuccess(this.t('webtrack', 'Settings saved'))
             } catch (e) {
                 showError(this.t('webtrack', 'Failed to save settings'))
+            }
+        },
+
+        async saveYouTubeApiKey() {
+            try {
+                await api.saveSettings({ youtubeApiKey: this.youtubeApiKeyInput })
+                this.settings.youtubeApiKeySet = true
+                this.youtubeApiKeyInput = ''
+                showSuccess(this.t('webtrack', 'YouTube API key saved'))
+            } catch (e) {
+                showError(this.t('webtrack', 'Failed to save YouTube API key'))
             }
         },
 
@@ -236,8 +266,9 @@ export default {
         },
 
         sourceLabel(sourceType) {
-            if (sourceType === 'google_news') return 'GNews'
-            if (sourceType === 'youtube')     return 'YouTube'
+            if (sourceType === 'google_news')    return 'GNews'
+            if (sourceType === 'youtube')        return 'YT channel'
+            if (sourceType === 'youtube_search') return 'YouTube'
             return 'URL'
         },
 

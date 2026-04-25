@@ -44,6 +44,7 @@ class TablesRowBuilder {
         string  $title,
         string  $pubDate,
         ?int    $campaignId,
+        string  $channelTitle = '',
     ): array {
         // Index columns by normalised title for O(1) lookup.
         $byTitle = [];
@@ -85,6 +86,9 @@ class TablesRowBuilder {
             'primary topic'=> null,    // human review required
             'comment'      => '',
             'campaign'     => $campaignId,
+            // YouTube search: the channel name (e.g. "Nextcloud GmbH")
+            'channel'      => $channelTitle !== '' ? $channelTitle : null,
+            'youtube channel' => $channelTitle !== '' ? $channelTitle : null,
         ];
 
         $data = [];

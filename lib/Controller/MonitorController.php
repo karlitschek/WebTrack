@@ -135,7 +135,7 @@ class MonitorController extends Controller {
     private function validate(array $data): array {
         $errors = [];
         if (empty(trim($data['name'] ?? '')))    { $errors[] = $this->l->t('Name is required'); }
-        // Auto-URL sources build their feed URL from keyword/channel — no manual URL needed.
+        // Auto-URL sources build their feed URL server-side — no manual URL needed.
         $sourceType = $data['sourceType'] ?? 'custom';
         if ($sourceType === 'custom') {
             if (empty(trim($data['url'] ?? '')))     { $errors[] = $this->l->t('URL is required'); }
@@ -144,6 +144,7 @@ class MonitorController extends Controller {
         if ($sourceType === 'youtube' && empty(trim($data['youtubeChannelId'] ?? ''))) {
             $errors[] = $this->l->t('Channel ID is required');
         }
+        // youtube_search uses no URL — the keyword is the search query
         if (empty(trim($data['keyword'] ?? ''))) { $errors[] = $this->l->t('Keyword is required'); }
         elseif (!empty($data['useRegex'])) {
             $pattern = trim($data['keyword']);
