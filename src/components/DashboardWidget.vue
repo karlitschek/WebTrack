@@ -16,8 +16,7 @@
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { translate } from '@nextcloud/l10n'
-import NcDashboardWidget from '@nextcloud/vue/dist/Components/NcDashboardWidget.js'
-import NcDashboardWidgetItem from '@nextcloud/vue/dist/Components/NcDashboardWidgetItem.js'
+import { NcDashboardWidget, NcDashboardWidgetItem } from '@nextcloud/vue'
 
 export default {
 	name: 'DashboardWidget',
