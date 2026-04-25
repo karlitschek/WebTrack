@@ -4,4 +4,4 @@
 \OCP\Util::addScript('webtrack', 'webtrack-main');
 \OCP\Util::addStyle('webtrack', 'webtrack-main');
 ?>
-<div id="app-content-vue"></div>
+<div id="webtrack-root"></div>

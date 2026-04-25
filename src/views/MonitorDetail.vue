@@ -108,11 +108,12 @@
 </template>
 
 <script>
-import NcActions      from '@nextcloud/vue/dist/Components/NcActions.js'
-import NcActionButton from '@nextcloud/vue/dist/Components/NcActionButton.js'
-import NcButton       from '@nextcloud/vue/dist/Components/NcButton.js'
-import NcEmptyContent from '@nextcloud/vue/dist/Components/NcEmptyContent.js'
-import NcLoadingIcon  from '@nextcloud/vue/dist/Components/NcLoadingIcon.js'
+import {
+    NcButton,
+    NcEmptyContent,
+    NcLoadingIcon,
+} from '@nextcloud/vue'
+import { emit } from '@nextcloud/event-bus'
 import Magnify            from 'vue-material-design-icons/Magnify.vue'
 import TimerOutline       from 'vue-material-design-icons/TimerOutline.vue'
 import Web                from 'vue-material-design-icons/Web.vue'
@@ -130,7 +131,22 @@ import * as api from '../services/api.js'
 
 export default {
     name: 'MonitorDetail',
-    components: { NcActions, NcActionButton, NcButton, NcEmptyContent, NcLoadingIcon, StatusBadge, HistoryTable, MonitorForm, Magnify, TimerOutline, Web, Rss, ClockOutline, CheckCircleOutline, AlertOutline, LinkVariant },
+    components: {
+        NcButton,
+        NcEmptyContent,
+        NcLoadingIcon,
+        StatusBadge,
+        HistoryTable,
+        MonitorForm,
+        Magnify,
+        TimerOutline,
+        Web,
+        Rss,
+        ClockOutline,
+        CheckCircleOutline,
+        AlertOutline,
+        LinkVariant,
+    },
     props: {
         id: { type: String, required: true },
     },
@@ -182,8 +198,7 @@ export default {
             try {
                 const resp = await api.pauseMonitor(this.monitor.id, this.monitor.isActive)
                 this.monitor = resp.data
-                // Refresh sidebar in App.vue
-                this.$root.$emit('monitors:refresh')
+                emit('webtrack:monitors:refresh')
                 this.$nextTick(() => { this.$refs.history?.load() })
                 showSuccess(
                     this.monitor.isActive
@@ -198,8 +213,7 @@ export default {
         onSaved(monitor) {
             this.monitor = monitor
             this.formOpen = false
-            // Refresh sidebar to reflect name/status changes
-            this.$root.$emit('monitors:refresh')
+            emit('webtrack:monitors:refresh')
             this.$nextTick(() => { this.$refs.history?.load() })
         },
 

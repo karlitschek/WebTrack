@@ -38,8 +38,7 @@
 </template>
 
 <script>
-import NcButton      from '@nextcloud/vue/dist/Components/NcButton.js'
-import NcLoadingIcon from '@nextcloud/vue/dist/Components/NcLoadingIcon.js'
+import { NcButton, NcLoadingIcon } from '@nextcloud/vue'
 import { showError } from '@nextcloud/dialogs'
 import { getLocale } from '@nextcloud/l10n'
 import * as api from '../services/api.js'

@@ -97,6 +97,39 @@ class MonitorService {
             $token = $data['talkRoomToken'];
             $monitor->setTalkRoomToken(($token !== '' && $token !== null) ? (string) $token : null);
         }
+
+        // Source configuration
+        if (isset($data['sourceType'])) {
+            $allowed = ['custom', 'google_news', 'youtube'];
+            $type    = in_array($data['sourceType'], $allowed, true) ? $data['sourceType'] : 'custom';
+            $monitor->setSourceType($type);
+        }
+        if (isset($data['sourceLanguage'])) {
+            $monitor->setSourceLanguage(substr(trim($data['sourceLanguage']), 0, 10));
+        }
+
+        // Relevance scoring
+        if (isset($data['scoreThreshold'])) {
+            $monitor->setScoreThreshold(max(0, (int) $data['scoreThreshold']));
+        }
+        if (isset($data['boostKeywords'])) {
+            $decoded = is_array($data['boostKeywords']) ? $data['boostKeywords'] : (json_decode($data['boostKeywords'], true) ?? []);
+            $monitor->setBoostKeywords(json_encode(array_values(array_filter($decoded, 'is_string'))) ?: '[]');
+        }
+        if (isset($data['excludePatterns'])) {
+            $decoded = is_array($data['excludePatterns']) ? $data['excludePatterns'] : (json_decode($data['excludePatterns'], true) ?? []);
+            $monitor->setExcludePatterns(json_encode(array_values(array_filter($decoded, 'is_string'))) ?: '[]');
+        }
+
+        // Nextcloud Tables integration
+        if (array_key_exists('tablesTableId', $data)) {
+            $id = $data['tablesTableId'];
+            $monitor->setTablesTableId(($id !== null && $id !== '') ? (int) $id : null);
+        }
+        if (array_key_exists('tablesCampaignId', $data)) {
+            $id = $data['tablesCampaignId'];
+            $monitor->setTablesCampaignId(($id !== null && $id !== '') ? (int) $id : null);
+        }
     }
 
     // -------------------------------------------------------------------------
