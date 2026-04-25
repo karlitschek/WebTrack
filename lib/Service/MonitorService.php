@@ -22,6 +22,9 @@ class MonitorService {
         private CheckService        $checkService,
         private FeedService         $feedService,
         private SnippetService      $snippetService,
+        private ScoringService      $scoringService,
+        private TablesService       $tablesService,
+        private TablesRowBuilder    $tablesRowBuilder,
         private NotificationService $notificationService,
         private IL10N               $l,
         private LoggerInterface     $logger,
@@ -96,6 +99,39 @@ class MonitorService {
         if (array_key_exists('talkRoomToken', $data)) {
             $token = $data['talkRoomToken'];
             $monitor->setTalkRoomToken(($token !== '' && $token !== null) ? (string) $token : null);
+        }
+
+        // Source configuration
+        if (isset($data['sourceType'])) {
+            $allowed = ['custom', 'google_news', 'youtube'];
+            $type    = in_array($data['sourceType'], $allowed, true) ? $data['sourceType'] : 'custom';
+            $monitor->setSourceType($type);
+        }
+        if (isset($data['sourceLanguage'])) {
+            $monitor->setSourceLanguage(substr(trim($data['sourceLanguage']), 0, 10));
+        }
+
+        // Relevance scoring
+        if (isset($data['scoreThreshold'])) {
+            $monitor->setScoreThreshold(max(0, (int) $data['scoreThreshold']));
+        }
+        if (isset($data['boostKeywords'])) {
+            $decoded = is_array($data['boostKeywords']) ? $data['boostKeywords'] : (json_decode($data['boostKeywords'], true) ?? []);
+            $monitor->setBoostKeywords(json_encode(array_values(array_filter($decoded, 'is_string'))) ?: '[]');
+        }
+        if (isset($data['excludePatterns'])) {
+            $decoded = is_array($data['excludePatterns']) ? $data['excludePatterns'] : (json_decode($data['excludePatterns'], true) ?? []);
+            $monitor->setExcludePatterns(json_encode(array_values(array_filter($decoded, 'is_string'))) ?: '[]');
+        }
+
+        // Nextcloud Tables integration
+        if (array_key_exists('tablesTableId', $data)) {
+            $id = $data['tablesTableId'];
+            $monitor->setTablesTableId(($id !== null && $id !== '') ? (int) $id : null);
+        }
+        if (array_key_exists('tablesCampaignId', $data)) {
+            $id = $data['tablesCampaignId'];
+            $monitor->setTablesCampaignId(($id !== null && $id !== '') ? (int) $id : null);
         }
     }
 
@@ -181,18 +217,112 @@ class MonitorService {
     }
 
     private function handleFeedContent(Monitor $monitor, string $content): void {
-        $entries = $this->feedService->parseEntries($content);
+        $entries    = $this->feedService->parseEntries($content);
         $newEntries = $this->feedService->filterNewEntries($monitor->getId(), $entries);
 
+        // Fetch the Tables column schema once (if configured) to avoid N requests.
+        $tableColumns = [];
+        if ($monitor->getTablesTableId() !== null) {
+            try {
+                $tableColumns = $this->tablesService->getColumns($monitor->getTablesTableId());
+            } catch (\Throwable $e) {
+                $this->logger->warning('[webtrack] Could not load Tables columns for monitor {id}: {err}', [
+                    'id'  => $monitor->getId(),
+                    'err' => $e->getMessage(),
+                ]);
+            }
+        }
+
         foreach ($newEntries as $entry) {
-            $combined = $entry['title'] . ' ' . strip_tags($entry['content']);
-            $snippet  = $this->snippetService->findSnippet($combined, $monitor->getKeyword(), $monitor->getUseRegex());
+            $url     = $entry['id'];   // feed entry ID is typically the article URL
+            $title   = $entry['title'];
+            $body    = $entry['content'];
+            $pubDate = $entry['pubDate'] ?? '';
+            $combined = $title . ' ' . strip_tags($body);
+
+            // Relevance filter: only applied for non-custom source types or when
+            // the monitor has a non-zero threshold / non-empty boost/exclude lists.
+            if ($monitor->getSourceType() !== 'custom' || $monitor->getScoreThreshold() > 0) {
+                if (!$this->scoringService->isRelevant($monitor, $url, $title, $body)) {
+                    $this->logger->debug('[webtrack] feed entry skipped (score too low): {title}', [
+                        'title' => mb_substr($title, 0, 80),
+                    ]);
+                    continue;
+                }
+            }
+
+            $snippet = $this->snippetService->findSnippet($combined, $monitor->getKeyword(), $monitor->getUseRegex());
             if ($snippet !== null) {
                 $monitor->setLastFoundAt((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
                 $monitor->setStatus('found');
                 $this->notificationService->notifyFound($monitor, $snippet);
                 $this->logEvent($monitor, 'found', $snippet);
+
+                // Write to Nextcloud Tables when configured.
+                if ($monitor->getTablesTableId() !== null && $tableColumns !== []) {
+                    $this->insertTablesRow($monitor, $tableColumns, $url, $title, $pubDate);
+                }
             }
+        }
+    }
+
+    /**
+     * Inserts a matched article as a new row in the monitor's configured table,
+     * unless a row with the same article URL already exists (duplicate check).
+     *
+     * @param array<array{id:int,title:string,type:string,selectionOptions?:array<array{id:int,label:string}>}> $columns
+     */
+    private function insertTablesRow(
+        Monitor $monitor,
+        array   $columns,
+        string  $url,
+        string  $title,
+        string  $pubDate,
+    ): void {
+        try {
+            // Locate the Headline column for duplicate detection.
+            $headlineCol = null;
+            foreach ($columns as $col) {
+                if (strcasecmp($col['title'], 'headline') === 0) {
+                    $headlineCol = $col;
+                    break;
+                }
+            }
+
+            // Duplicate check: skip if the URL is already in the table.
+            if ($headlineCol !== null) {
+                $isDuplicate = $this->tablesService->rowExistsForUrl(
+                    $monitor->getTablesTableId(),
+                    $headlineCol['id'],
+                    $url,
+                );
+                if ($isDuplicate) {
+                    $this->logger->debug('[webtrack] Tables row skipped (duplicate URL) for monitor {id}: {url}', [
+                        'id'  => $monitor->getId(),
+                        'url' => $url,
+                    ]);
+                    return;
+                }
+            }
+
+            $data = $this->tablesRowBuilder->build(
+                columns:    $columns,
+                monitor:    $monitor,
+                entryUrl:   $url,
+                title:      $title,
+                pubDate:    $pubDate,
+                campaignId: $monitor->getTablesCampaignId(),
+            );
+            $this->tablesService->insertRow($monitor->getTablesTableId(), $data);
+            $this->logger->info('[webtrack] Tables row inserted for monitor {id}: {title}', [
+                'id'    => $monitor->getId(),
+                'title' => mb_substr($title, 0, 80),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('[webtrack] Tables insert failed for monitor {id}: {err}', [
+                'id'  => $monitor->getId(),
+                'err' => $e->getMessage(),
+            ]);
         }
     }
 
