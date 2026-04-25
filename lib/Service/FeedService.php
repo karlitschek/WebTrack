@@ -53,7 +53,8 @@ class FeedService {
                 $id      = (string) ($entry->id ?? '');
                 $title   = (string) ($entry->title ?? '');
                 $content = (string) ($entry->content ?? $entry->summary ?? '');
-                $entries[] = ['id' => $id ?: $title, 'title' => $title, 'content' => $content];
+                $pubDate = (string) ($entry->published ?? $entry->updated ?? '');
+                $entries[] = ['id' => $id ?: $title, 'title' => $title, 'content' => $content, 'pubDate' => $pubDate];
             }
             return $entries;
         }
@@ -64,6 +65,7 @@ class FeedService {
             $id      = (string) ($item->guid ?? $item->link ?? '');
             $title   = (string) ($item->title ?? '');
             $content = (string) ($item->description ?? '');
+            $pubDate = (string) ($item->pubDate ?? $item->pubdate ?? '');
             // Try content:encoded
             foreach ($ns as $prefix => $uri) {
                 if (str_contains($uri, 'content')) {
@@ -73,7 +75,7 @@ class FeedService {
                     }
                 }
             }
-            $entries[] = ['id' => $id ?: $title, 'title' => $title, 'content' => $content];
+            $entries[] = ['id' => $id ?: $title, 'title' => $title, 'content' => $content, 'pubDate' => $pubDate];
         }
 
         return $entries;

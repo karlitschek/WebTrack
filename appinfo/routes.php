@@ -26,6 +26,10 @@ return [
         // Talk rooms
         ['name' => 'talk_room#index', 'url' => '/api/v1/talk/rooms', 'verb' => 'GET'],
 
+        // Tables integration
+        ['name' => 'tables#index',   'url' => '/api/v1/tables',          'verb' => 'GET'],
+        ['name' => 'tables#columns', 'url' => '/api/v1/tables/{id}/columns', 'verb' => 'GET'],
+
         // Dashboard
         ['name' => 'dashboard#recent_finds', 'url' => '/api/v1/dashboard/recent-finds', 'verb' => 'GET'],
     ],
