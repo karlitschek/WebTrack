@@ -55,6 +55,7 @@ class MonitorService {
         $monitor->setUserId($userId);
         $this->applyData($monitor, $data);
         $this->applyGoogleNewsUrl($monitor);
+        $this->applyYouTubeUrl($monitor, $data);
         $monitor->setIsActive(true);
         $monitor->setIsFeed($monitor->getIsFeed());
         $monitor->setStatus('ok');
@@ -69,6 +70,7 @@ class MonitorService {
         $monitor = $this->monitorMapper->findByIdAndUser($id, $userId);
         $this->applyData($monitor, $data);
         $this->applyGoogleNewsUrl($monitor);
+        $this->applyYouTubeUrl($monitor, $data);
         return $this->monitorMapper->update($monitor);
     }
 
@@ -140,6 +142,28 @@ class MonitorService {
 
         $this->logEvent($monitor, $paused ? 'paused' : 'resumed');
         return $monitor;
+    }
+
+    /**
+     * For YouTube monitors, builds and stores the channel RSS feed URL from
+     * the youtubeChannelId supplied in the request data.
+     *
+     * Example: channelId="UCxxxxxx"
+     *   → https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxx
+     */
+    private function applyYouTubeUrl(Monitor $monitor, array $data): void {
+        if ($monitor->getSourceType() !== 'youtube') {
+            return;
+        }
+
+        $channelId = trim($data['youtubeChannelId'] ?? '');
+        if ($channelId === '') {
+            return;
+        }
+
+        $url = 'https://www.youtube.com/feeds/videos.xml?channel_id=' . rawurlencode($channelId);
+        $monitor->setUrl($url);
+        $monitor->setIsFeed(true);
     }
 
     private function applyData(Monitor $monitor, array $data): void {
