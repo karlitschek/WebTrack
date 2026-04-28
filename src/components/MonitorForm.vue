@@ -3,7 +3,16 @@
         <div class="wn-form-container">
             <h2 class="wn-form-title">{{ title }}</h2>
 
-            <!-- ── Source type — always first ── -->
+            <!-- ── Name — always first ── -->
+            <fieldset class="wn-form-section">
+                <div class="wn-form-row">
+                    <label for="wn-name">{{ t('webtrack', 'Name') }} *</label>
+                    <input id="wn-name" v-model.trim="form.name" type="text"
+                        :placeholder="t('webtrack', 'My monitor')" @keydown.enter.prevent />
+                </div>
+            </fieldset>
+
+            <!-- ── Source type ── -->
             <fieldset class="wn-form-section">
                 <legend>{{ t('webtrack', 'Source') }}</legend>
 
@@ -76,15 +85,6 @@
                     </span>
                     <span v-else-if="urlTestError" class="wn-error-text">{{ urlTestError }}</span>
                     <div v-if="urlTestResult && urlTestResult.preview" class="wn-preview-box">{{ urlTestResult.preview }}</div>
-                </div>
-            </fieldset>
-
-            <!-- ── Basic info ── -->
-            <fieldset class="wn-form-section">
-                <div class="wn-form-row">
-                    <label for="wn-name">{{ t('webtrack', 'Name') }} *</label>
-                    <input id="wn-name" v-model.trim="form.name" type="text"
-                        :placeholder="t('webtrack', 'My monitor')" @keydown.enter.prevent />
                 </div>
             </fieldset>
 
