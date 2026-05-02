@@ -87,6 +87,82 @@ class DomainLookupService {
     public const VOLUME_MAJOR_MENTION = 1;  // keyword mentioned 5+ times in body
     public const VOLUME_MINOR_MENTION = 2;  // keyword mentioned 1–4 times in body
 
+    // -------------------------------------------------------------------------
+    // Human-readable labels (for text-type columns in Tables)
+    // -------------------------------------------------------------------------
+    private const COUNTRY_LABELS = [
+        self::COUNTRY_GERMANY     => 'Germany',
+        self::COUNTRY_AUSTRIA     => 'Austria',
+        self::COUNTRY_SWITZERLAND => 'Switzerland',
+        self::COUNTRY_FRANCE      => 'France',
+        self::COUNTRY_SPAIN       => 'Spain',
+        self::COUNTRY_NETHERLANDS => 'Netherlands',
+        self::COUNTRY_BELGIUM     => 'Belgium',
+        self::COUNTRY_UK          => 'UK',
+        self::COUNTRY_US          => 'US',
+        self::COUNTRY_DENMARK     => 'Denmark',
+        self::COUNTRY_SWEDEN      => 'Sweden',
+        self::COUNTRY_FINLAND     => 'Finland',
+        self::COUNTRY_NORWAY      => 'Norway',
+        self::COUNTRY_JAPAN       => 'Japan',
+        self::COUNTRY_MIDDLE_EAST => 'Middle East',
+        self::COUNTRY_ITALY       => 'Italy',
+        self::COUNTRY_EU          => 'EU',
+        self::COUNTRY_OTHER       => 'Other',
+    ];
+
+    private const TIER_LABELS = [
+        self::TIER_MAJOR_BUSINESS => 'Major business press',
+        self::TIER_MAJOR_TECH     => 'Major tech press',
+        self::TIER_YOUTUBE        => 'YouTube / podcast',
+        self::TIER_LOCAL_TECH     => 'Local tech press',
+        self::TIER_OTHER          => 'Other',
+    ];
+
+    private const SOURCE_LABELS = [
+        self::SOURCE_ORGANIC           => 'Organic',
+        self::SOURCE_PRESS_RELEASE     => 'Press release',
+        self::SOURCE_INTERVIEW         => 'Interview',
+        self::SOURCE_WRITTEN_STATEMENT => 'Written statement',
+        self::SOURCE_BLOG              => 'Blog',
+    ];
+
+    private const VOLUME_LABELS = [
+        self::VOLUME_EXCLUSIVE     => 'Exclusive',
+        self::VOLUME_MAJOR_MENTION => 'Major mention',
+        self::VOLUME_MINOR_MENTION => 'Minor mention',
+    ];
+
+    private const CATEGORY_LABELS = [
+        self::CAT_MEDIA_ARTICLE => 'Media Article',
+        self::CAT_YOUTUBE       => 'YouTube',
+        self::CAT_BLOG          => 'Blog',
+        self::CAT_TV            => 'TV',
+        self::CAT_RADIO         => 'Radio',
+        self::CAT_OTHER         => 'Other',
+        self::CAT_PODCAST       => 'Podcast',
+    ];
+
+    public static function countryLabel(int $id): string {
+        return self::COUNTRY_LABELS[$id] ?? 'Other';
+    }
+
+    public static function tierLabel(int $id): string {
+        return self::TIER_LABELS[$id] ?? 'Other';
+    }
+
+    public static function sourceLabel(int $id): string {
+        return self::SOURCE_LABELS[$id] ?? 'Organic';
+    }
+
+    public static function volumeLabel(int $id): string {
+        return self::VOLUME_LABELS[$id] ?? 'Minor mention';
+    }
+
+    public static function categoryLabel(int $id): string {
+        return self::CATEGORY_LABELS[$id] ?? 'Media Article';
+    }
+
     /**
      * Domain → [country_id, tier_id] lookup table.
      * Seeded from ~1 500 historical PR Coverage rows.

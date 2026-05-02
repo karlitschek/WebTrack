@@ -337,6 +337,7 @@ class MonitorService {
     private function processNewEntries(Monitor $monitor, array $newEntries): void {
         // Fetch (or auto-create) the Tables column schema once per check cycle.
         $tableColumns = [];
+        $headlineCol  = null;   // resolved once, reused for per-entry dedup
         if ($monitor->getTablesTableId() !== null) {
             try {
                 $tableColumns = $this->tablesService->getColumnsForUser(
@@ -364,6 +365,14 @@ class MonitorService {
                     'err' => $e->getMessage(),
                 ]);
             }
+
+            // Locate the Headline column once — used for per-entry URL dedup.
+            foreach ($tableColumns as $col) {
+                if (strcasecmp($col['title'], 'headline') === 0) {
+                    $headlineCol = $col;
+                    break;
+                }
+            }
         }
 
         foreach ($newEntries as $entry) {
@@ -372,6 +381,27 @@ class MonitorService {
             $body         = $entry['content'];
             $pubDate      = $entry['pubDate']      ?? '';
             $channelTitle = $entry['channelTitle'] ?? '';   // YouTube search only
+
+            // ── URL-level duplicate guard ──────────────────────────────────────
+            // The feed's seenIds list caps at 500 entries, so an old article can
+            // re-appear as "new" once the window slides.  Check the Tables row
+            // directly (fast DB query, works in all contexts) to prevent both
+            // duplicate table rows AND duplicate Talk notifications.
+            if ($headlineCol !== null) {
+                try {
+                    if ($this->tablesService->rowExistsForUrl(
+                        $monitor->getTablesTableId(),
+                        $headlineCol['id'],
+                        $url,
+                    )) {
+                        $this->logger->debug('[webtrack] entry skipped (already in table): {url}', ['url' => $url]);
+                        continue;
+                    }
+                } catch (\Throwable $e) {
+                    // If the check fails, proceed — better a duplicate than a miss.
+                    $this->logger->debug('[webtrack] rowExistsForUrl failed, proceeding: {err}', ['err' => $e->getMessage()]);
+                }
+            }
 
             // $combinedForSnippet: title + body text — used for snippet extraction
             // and custom-source keyword matching.  Kept separate so that the
@@ -427,8 +457,10 @@ class MonitorService {
     }
 
     /**
-     * Inserts a matched article as a new row in the monitor's configured table,
-     * unless a row with the same article URL already exists (duplicate check).
+     * Inserts a matched article as a new row in the monitor's configured table.
+     *
+     * The caller (processNewEntries) already performed the URL duplicate check
+     * before calling this method, so no second check is needed here.
      *
      * @param array<array{id:int,title:string,type:string,selectionOptions?:array<array{id:int,label:string}>}> $columns
      */
@@ -442,31 +474,6 @@ class MonitorService {
         string  $channelTitle = '',
     ): void {
         try {
-            // Locate the Headline column for duplicate detection.
-            $headlineCol = null;
-            foreach ($columns as $col) {
-                if (strcasecmp($col['title'], 'headline') === 0) {
-                    $headlineCol = $col;
-                    break;
-                }
-            }
-
-            // Duplicate check: skip if the URL is already in the table.
-            if ($headlineCol !== null) {
-                $isDuplicate = $this->tablesService->rowExistsForUrl(
-                    $monitor->getTablesTableId(),
-                    $headlineCol['id'],
-                    $url,
-                );
-                if ($isDuplicate) {
-                    $this->logger->debug('[webtrack] Tables row skipped (duplicate URL) for monitor {id}: {url}', [
-                        'id'  => $monitor->getId(),
-                        'url' => $url,
-                    ]);
-                    return;
-                }
-            }
-
             $data = $this->tablesRowBuilder->build(
                 columns:      $columns,
                 monitor:      $monitor,
@@ -477,7 +484,7 @@ class MonitorService {
                 campaignId:   $monitor->getTablesCampaignId(),
                 channelTitle: $channelTitle,
             );
-            $this->tablesService->insertRow($monitor->getTablesTableId(), $data);
+            $this->tablesService->insertRowForUser($monitor->getTablesTableId(), $data, $monitor->getUserId());
             $this->logger->info('[webtrack] Tables row inserted for monitor {id}: {title}', [
                 'id'    => $monitor->getId(),
                 'title' => mb_substr($title, 0, 80),

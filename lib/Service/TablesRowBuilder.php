@@ -59,34 +59,48 @@ class TablesRowBuilder {
         $today = date('Y-m-d');
         $date  = $pubDate ? (date('Y-m-d', strtotime($pubDate)) ?: $today) : $today;
 
-        // Extract the publication name from the article URL hostname.
+        // ── Publication name ──────────────────────────────────────────────────
+        // Google News (and many RSS aggregators) append " - PublicationName" to
+        // article titles.  Extract the last " - …" segment when the URL is a
+        // Google News proxy URL; fall back to hostname parsing for direct URLs.
         $host = strtolower((string) parse_url($entryUrl, PHP_URL_HOST));
         $host = (string) preg_replace('/^www\./', '', $host);
-        // Capitalise first segment as a reasonable publication name.
-        $publication = ucfirst(explode('.', $host)[0]);
+
+        if (str_contains($host, 'news.google.com') || str_contains($host, 'google.com')) {
+            // Try " - Publication" suffix in the title (last occurrence).
+            if (preg_match('/ - ([^-]{2,60})$/', $title, $m)) {
+                $publication = trim($m[1]);
+            } else {
+                $publication = '';
+            }
+        } else {
+            // Direct URL: derive from hostname (e.g. "theregister.com" → "Theregister").
+            $publication = ucfirst(explode('.', $host)[0]);
+        }
 
         $countryId  = $this->domainLookup->getCountryId($entryUrl);
         $tierId     = $this->domainLookup->getTierId($entryUrl);
         $categoryId = $this->domainLookup->getCategoryId($entryUrl, $title);
 
+        // ── Volume detection ──────────────────────────────────────────────────
+        $volumeId = $this->detectVolume($monitor->getKeyword(), $title, $body);
+
         // Markdown hyperlink for the headline column (rich text).
         $safeTitle   = str_replace(['[', ']', '(', ')'], ['\\[', '\\]', '\\(', '\\)'], $title);
         $mdHeadline  = "[{$safeTitle}]({$entryUrl})";
 
-        // ── Volume detection ──────────────────────────────────────────────────
-        // Keyword is from the monitor configuration (the tracked search term).
-        $volumeId = $this->detectVolume($monitor->getKeyword(), $title, $body);
-
         // Column value resolvers — keyed by lowercase column title.
+        // All lookup columns are plain text in the table schema, so we send
+        // human-readable labels rather than integer selection IDs.
         $resolvers = [
             'date'         => $date,
-            'country'      => $countryId,
+            'country'      => DomainLookupService::countryLabel($countryId),
             'publication'  => $publication,
             'headline'     => $mdHeadline,
-            'tier'         => $tierId,
-            'source'       => DomainLookupService::SOURCE_ORGANIC,
-            'category'     => $categoryId,
-            'volume'       => $volumeId,
+            'tier'         => DomainLookupService::tierLabel($tierId),
+            'source'       => DomainLookupService::sourceLabel(DomainLookupService::SOURCE_ORGANIC),
+            'category'     => DomainLookupService::categoryLabel($categoryId),
+            'volume'       => DomainLookupService::volumeLabel($volumeId),
             'counter'      => 1,
             'actual/plan'  => null,    // leave empty
             'journalist'   => '',      // human review required

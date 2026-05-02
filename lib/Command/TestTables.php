@@ -97,7 +97,7 @@ class TestTables extends Command {
         // Fetch column schema
         $output->writeln("\n<comment>Fetching column schema for table {$tableId}…</comment>");
         try {
-            $columns = $this->tablesService->getColumns($tableId);
+            $columns = $this->tablesService->getColumnsForUser($tableId, $monitor->getUserId());
         } catch (\Throwable $e) {
             $output->writeln('<error>Could not fetch columns: ' . $e->getMessage() . '</error>');
             return Command::FAILURE;
@@ -161,7 +161,7 @@ class TestTables extends Command {
         if ($input->getOption('insert')) {
             $output->writeln("\n<comment>Inserting row…</comment>");
             try {
-                $row = $this->tablesService->insertRow($tableId, $data);
+                $row = $this->tablesService->insertRowForUser($tableId, $data, $monitor->getUserId());
                 $output->writeln(sprintf('  <info>Row inserted! id=%s</info>', $row['id'] ?? '?'));
             } catch (\Throwable $e) {
                 $output->writeln('<error>Insert failed: ' . $e->getMessage() . '</error>');

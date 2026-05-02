@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\WebTrack\Service;
 
 use OCP\Http\Client\IClientService;
+use OCP\IDBConnection;
 use OCP\IURLGenerator;
 use Psr\Log\LoggerInterface;
 
@@ -28,6 +29,7 @@ class TablesService {
         private IClientService  $clientService,
         private IURLGenerator   $urlGenerator,
         private LoggerInterface $logger,
+        private IDBConnection   $db,
     ) {
     }
 
@@ -82,7 +84,8 @@ class TablesService {
                     'title'            => $c->getTitle(),
                     'type'             => $c->getType(),
                     'subtype'          => $c->getSubtype() ?? '',
-                    'selectionOptions' => json_decode($c->getSelectionOptions() ?? '[]', true) ?? [],
+                    // getSelectionOptionsArray() decodes the JSON internally
+                    'selectionOptions' => $c->getSelectionOptionsArray(),
                 ], $columns);
             } catch (\Throwable $e) {
                 $this->logger->warning('[webtrack] Tables PHP API (columns) failed, trying HTTP: ' . $e->getMessage());
@@ -154,26 +157,141 @@ class TablesService {
     }
 
     /**
-     * Checks whether the given URL already appears in the Headline column of
-     * the target table.  Uses a `contains` filter on the column identified by
-     * $headlineColumnId; returns true if at least one row is found.
+     * Inserts a new row into a table, working in all execution contexts
+     * (web request, background job, CLI).
      *
-     * @param int    $tableId         Table to search
+     * Uses OCA\Tables\Service\RowService::create() as the primary path.
+     * RowService and its dependencies (PermissionsService, Row2Mapper) store
+     * the current user in a $userId field that the DI container injects at
+     * construction time.  In CLI / background-job context the DI-resolved
+     * userId is null, which causes RowService to throw.
+     *
+     * Fix: temporarily patch the protected/private $userId field on each of
+     * those singletons via PHP Reflection, make the call, then restore the
+     * original value.  The patch is restricted to the three known singletons
+     * and is always undone in the finally block.
+     *
+     * @param array<array{columnId:int,value:mixed}> $data
+     * @throws \RuntimeException on both PHP and HTTP failure
+     */
+    public function insertRowForUser(int $tableId, array $data, string $userId): array {
+        if (class_exists('\OCA\Tables\Service\RowService')
+            && class_exists('\OCA\Tables\Service\PermissionsService')
+            && class_exists('\OCA\Tables\Db\Row2Mapper')
+        ) {
+            try {
+                /** @var \OCA\Tables\Service\RowService $rowService */
+                $rowService = \OCP\Server::get(\OCA\Tables\Service\RowService::class);
+                /** @var \OCA\Tables\Service\PermissionsService $permService */
+                $permService = \OCP\Server::get(\OCA\Tables\Service\PermissionsService::class);
+                /** @var \OCA\Tables\Db\Row2Mapper $row2Mapper */
+                $row2Mapper = \OCP\Server::get(\OCA\Tables\Db\Row2Mapper::class);
+
+                $prevRowSvc  = $this->reflectionPatchUserId($rowService,  $userId);
+                $prevPermSvc = $this->reflectionPatchUserId($permService,  $userId);
+                $prevMapper  = $this->reflectionPatchUserId($row2Mapper,   $userId);
+
+                // Diagnostic: confirm the patch took effect before calling create().
+                $check = $this->reflectionReadUserId($rowService);
+                $this->logger->debug('[webtrack] RowService userId after patch: ' . var_export($check, true));
+
+                try {
+                    $row = $rowService->create($tableId, null, $data);
+                    return is_array($row) ? $row : ['id' => $row->getId()];
+                } finally {
+                    $this->reflectionPatchUserId($rowService,  $prevRowSvc);
+                    $this->reflectionPatchUserId($permService,  $prevPermSvc);
+                    $this->reflectionPatchUserId($row2Mapper,   $prevMapper);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('[webtrack] Tables PHP API (insertRow) failed, trying HTTP: ' . $e->getMessage());
+            }
+        }
+        // HTTP fallback (works only in web-request context with an active session).
+        return $this->insertRow($tableId, $data);
+    }
+
+    /**
+     * Finds the $userId property on $object (searching up the class hierarchy),
+     * sets it to $newValue, and returns the previous value.
+     *
+     * Used to temporarily inject a user identity into Tables service singletons
+     * that have it set only once at DI construction time.
+     *
+     * @param object $object Target service instance
+     * @param string|null $newValue New userId to inject
+     * @return string|null Previous value of the property
+     */
+    private function reflectionPatchUserId(object $object, ?string $newValue): ?string {
+        $class = new \ReflectionClass($object);
+        while ($class !== false) {
+            if ($class->hasProperty('userId')) {
+                $prop = $class->getProperty('userId');
+                $prop->setAccessible(true);
+                $previous = $prop->getValue($object);
+                $prop->setValue($object, $newValue);
+                return $previous;
+            }
+            $class = $class->getParentClass();
+        }
+        $this->logger->warning('[webtrack] reflectionPatchUserId: userId property not found on ' . get_class($object));
+        return null;
+    }
+
+    private function reflectionReadUserId(object $object): ?string {
+        $class = new \ReflectionClass($object);
+        while ($class !== false) {
+            if ($class->hasProperty('userId')) {
+                $prop = $class->getProperty('userId');
+                $prop->setAccessible(true);
+                return $prop->getValue($object);
+            }
+            $class = $class->getParentClass();
+        }
+        return 'NOT_FOUND';
+    }
+
+    /**
+     * Checks whether the given URL already appears in the Headline column of
+     * the target table.  Uses the PHP RowService (if available) or HTTP search
+     * API; returns true if at least one matching row is found.
+     *
+     * Failures are swallowed and treated as "not a duplicate" so that a broken
+     * search never prevents a row from being inserted.
+     *
+     * @param int    $tableId          Table to search
      * @param int    $headlineColumnId Column ID of the "Headline" column
-     * @param string $url             Article URL to look for
-     * @throws \RuntimeException
+     * @param string $url              Article URL to look for
      */
     public function rowExistsForUrl(int $tableId, int $headlineColumnId, string $url): bool {
-        $rows = $this->searchRows(
-            tableId: $tableId,
-            filter: [[
-                'columnId' => $headlineColumnId,
-                'operator' => 'contains',
-                'value'    => $url,
-            ]],
-            limit: 1,
-        );
-        return count($rows) > 0;
+        // Direct DB query: check oc_tables_row_cells_text for a row in the
+        // target table whose Headline cell contains the URL.
+        //
+        // This approach is O(1) (indexed column_id lookup + LIKE on value),
+        // works in all execution contexts (web, CLI, background job), is not
+        // limited by a service-layer row-count cap, and requires no userId /
+        // permission workaround.
+        //
+        // The JOIN to oc_tables_row_sleeves restricts the search to the
+        // correct table (cells don't store table_id directly).
+        try {
+            $qb = $this->db->getQueryBuilder();
+            $qb->select($qb->createFunction('1'))
+                ->from('tables_row_cells_text', 'c')
+                ->innerJoin('c', 'tables_row_sleeves', 's', $qb->expr()->eq('c.row_id', 's.id'))
+                ->where($qb->expr()->eq('s.table_id', $qb->createNamedParameter($tableId, \OCP\DB\QueryBuilder\IQueryBuilder::PARAM_INT)))
+                ->andWhere($qb->expr()->eq('c.column_id', $qb->createNamedParameter($headlineColumnId, \OCP\DB\QueryBuilder\IQueryBuilder::PARAM_INT)))
+                ->andWhere($qb->expr()->like('c.value', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($url) . '%')))
+                ->setMaxResults(1);
+
+            $result = $qb->executeQuery();
+            $exists = $result->fetchOne() !== false;
+            $result->closeCursor();
+            return $exists;
+        } catch (\Throwable $e) {
+            $this->logger->warning('[webtrack] rowExistsForUrl DB query failed (treating as not duplicate): ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -189,37 +307,16 @@ class TablesService {
      */
     public function createColumn(int $tableId, array $colDef, string $userId): array {
         // Try the Tables PHP service first (available in all contexts).
-        if (class_exists('\OCA\Tables\Service\ColumnService')) {
+        // ColumnService::create() takes a ColumnDto object as its 4th argument.
+        if (class_exists('\OCA\Tables\Service\ColumnService')
+            && class_exists('\OCA\Tables\Dto\Column')
+        ) {
             try {
                 /** @var \OCA\Tables\Service\ColumnService $svc */
                 $svc = \OCP\Server::get(\OCA\Tables\Service\ColumnService::class);
-                $col = $svc->create(
-                    userId:           $userId,
-                    tableId:          $tableId,
-                    viewId:           null,
-                    type:             $colDef['type'],
-                    subtype:          $colDef['subtype'] ?? '',
-                    title:            $colDef['title'],
-                    mandatory:        $colDef['mandatory'] ?? false,
-                    description:      $colDef['description'] ?? '',
-                    textDefault:      $colDef['textDefault'] ?? '',
-                    textAllowedPattern: $colDef['textAllowedPattern'] ?? '',
-                    textMaxLength:    $colDef['textMaxLength'] ?? null,
-                    numberDefault:    isset($colDef['numberDefault']) ? (float) $colDef['numberDefault'] : null,
-                    numberMin:        $colDef['numberMin'] ?? null,
-                    numberMax:        $colDef['numberMax'] ?? null,
-                    numberDecimals:   $colDef['numberDecimals'] ?? 0,
-                    numberPrefix:     $colDef['numberPrefix'] ?? '',
-                    numberSuffix:     $colDef['numberSuffix'] ?? '',
-                    selectionOptions: $colDef['selectionOptions'] ?? '',
-                    selectionDefault: $colDef['selectionDefault'] ?? '',
-                    datetimeDefault:  $colDef['datetimeDefault'] ?? '',
-                    usergroupDefault:           $colDef['usergroupDefault'] ?? [],
-                    usergroupAllowUsernames:    $colDef['usergroupAllowUsernames'] ?? false,
-                    usergroupAllowGroups:       $colDef['usergroupAllowGroups'] ?? false,
-                    usergroupAllowTeams:        $colDef['usergroupAllowTeams'] ?? false,
-                    showUserStatus:             $colDef['showUserStatus'] ?? false,
-                );
+                /** @var \OCA\Tables\Dto\Column $dto */
+                $dto = \OCA\Tables\Dto\Column::createFromArray($colDef);
+                $col = $svc->create($userId, $tableId, null, $dto);
                 return [
                     'id'    => $col->getId(),
                     'title' => $col->getTitle(),
@@ -242,7 +339,7 @@ class TablesService {
      * @throws \RuntimeException on HTTP/PHP service failure
      */
     public function ensurePrCoverageColumns(int $tableId, string $userId): void {
-        $existing = $this->getColumns($tableId);
+        $existing = $this->getColumnsForUser($tableId, $userId);
         if ($existing !== []) {
             return;   // already set up
         }
